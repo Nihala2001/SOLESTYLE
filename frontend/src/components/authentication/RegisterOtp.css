@@ -1,0 +1,268 @@
+/* ================= GENERAL ================= */
+
+.otp-page {
+  min-height: 100vh;
+  display: flex;
+  background-color: #fdf8f5;
+  color: #432f32;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+
+/* ================= LEFT SIDE ================= */
+
+
+
+.otp-brand {
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: #8f5360;
+}
+
+
+/* ================= RIGHT SIDE ================= */
+
+.otp {
+   width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background-color: #fffaf7;
+}
+
+
+/* ================= CARD ================= */
+
+.otp-card {
+  width: 100%;
+  max-width: 460px;
+  padding: 45px;
+  background-color: #ffffff;
+  border: 1px solid #eadbd4;
+  box-shadow: 0 15px 45px rgba(80, 45, 45, 0.08);
+}
+
+
+/* ================= HEADING ================= */
+
+.otp-heading {
+  margin-bottom: 35px;
+}
+
+.otp-heading > p {
+  margin: 0 0 12px;
+  color: #a45f6c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+}
+
+.otp-heading h2 {
+  margin: 0 0 12px;
+  font-family: Georgia, serif;
+  font-size: 38px;
+  font-weight: 500;
+  color: #432f32;
+}
+
+.otp-heading span {
+  color: #806d6d;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.otp-heading strong {
+  color: #8f5360;
+  font-weight: 600;
+}
+
+
+/* ================= FORM ================= */
+
+.otp-card form {
+  display: flex;
+  flex-direction: column;
+}
+
+.otp-card label {
+  margin-bottom: 8px;
+  color: #4c3838;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.otp-card input {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #d9c5c0;
+  outline: none;
+  background-color: #fdf8f5;
+  color: #432f32;
+  font-size: 22px;
+  letter-spacing: 8px;
+  text-align: center;
+  transition: 0.2s;
+}
+
+.otp-card input:focus {
+  border-color: #8f5360;
+  background-color: #ffffff;
+}
+
+
+/* ================= ERRORS ================= */
+
+.otp-error {
+  margin: 7px 0 0;
+  color: #d32f2f;
+  font-size: 13px;
+}
+
+.otp-success {
+  margin: 7px 0 0;
+  color: #4f8060;
+  font-size: 13px;
+}
+
+
+/* ================= VERIFY BUTTON ================= */
+
+.otp-verify-button {
+  width: 100%;
+  margin-top: 22px;
+  padding: 15px;
+  border: none;
+  background-color: #8f5360;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.otp-verify-button:hover {
+  background-color: #713f4b;
+}
+
+.otp-verify-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* ================= RESEND ================= */
+
+.resend-section {
+  margin-top: 25px;
+  text-align: center;
+}
+
+.resend-section p {
+  margin: 0 0 8px;
+  color: #806d6d;
+  font-size: 13px;
+}
+
+.resend-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #8f5360;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.resend-button:hover {
+  color: #713f4b;
+  text-decoration: underline;
+}
+
+.resend-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* ================= BACK ================= */
+
+.back-login {
+  display: block;
+  margin: 30px auto 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #806d6d;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.back-login:hover {
+  color: #8f5360;
+}
+
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 850px) {
+
+  .otp-page {
+    flex-direction: column;
+  }
+
+  .otp-left {
+    width: 100%;
+    min-height: 40vh;
+    padding: 30px;
+  }
+
+  .otp-left-content {
+    margin: 60px 0 20px;
+  }
+
+  .otp-left-content h1 {
+    font-size: 48px;
+  }
+
+  .otp-right {
+    width: 100%;
+    min-height: 60vh;
+    padding: 30px 20px;
+  }
+
+  .otp-card {
+    padding: 35px 25px;
+  }
+}
+
+
+@media (max-width: 500px) {
+
+  .otp-left {
+    min-height: 35vh;
+  }
+
+  .otp-brand {
+    font-size: 20px;
+  }
+
+  .otp-left-content h1 {
+    font-size: 40px;
+  }
+
+  .otp-heading h2 {
+    font-size: 31px;
+  }
+
+  .otp-card {
+    padding: 30px 20px;
+  }
+}

@@ -1,0 +1,336 @@
+.categories-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.categories-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.categories-header p {
+  margin-top: 6px;
+  color: #777;
+}
+
+.add-category-button {
+  border: none;
+  padding: 11px 18px;
+  border-radius: 8px;
+  background: #222;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.category-search {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.category-search input {
+  width: 300px;
+  padding: 11px 13px;
+  border: 1px solid #ddd;
+  border-radius: 7px;
+  outline: none;
+}
+
+.category-search button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  background: #222;
+  color: white;
+}
+
+.category-search .clear-button {
+  background: #eee;
+  color: #333;
+}
+
+.category-table-container {
+  background: white;
+  border-radius: 10px;
+  overflow-x: auto;
+  border: 1px solid #eee;
+}
+
+.category-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.category-table th,
+.category-table td {
+  padding: 15px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.category-table th {
+  font-size: 13px;
+  color: #666;
+}
+
+.status-active,
+.status-inactive {
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.status-active {
+  background: #e8f7ed;
+  color: #218838;
+}
+
+.status-inactive {
+  background: #f5f5f5;
+  color: #777;
+}
+
+.edit-button,
+.delete-button {
+  padding: 7px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-right: 7px;
+}
+
+.edit-button {
+  background: #f0edf8;
+  color: #5c477d;
+}
+
+.delete-button {
+  background: #fdecec;
+  color: #c62828;
+}
+
+.category-message {
+  padding: 50px;
+  text-align: center;
+  color: #777;
+}
+
+.category-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.category-pagination button {
+  padding: 8px 14px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.category-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ================= CATEGORY MODAL ================= */
+
+.category-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  background: rgba(0, 0, 0, 0.45);
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  z-index: 1000;
+}
+
+
+/* Modal box */
+
+.category-modal {
+  width: 420px;
+  max-width: 90%;
+
+  background: #ffffff;
+
+  border-radius: 14px;
+
+  padding: 30px;
+
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+}
+
+
+/* Title */
+
+.category-modal h2 {
+  margin: 0 0 8px;
+
+  font-size: 24px;
+
+  color: #333;
+}
+
+
+/* Description */
+
+.modal-description {
+  margin: 0 0 25px;
+
+  color: #777;
+
+  font-size: 14px;
+}
+
+
+/* Label */
+
+.category-modal label {
+  display: block;
+
+  margin-bottom: 8px;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  color: #444;
+}
+
+
+/* Input */
+
+.category-modal input {
+  width: 100%;
+
+  box-sizing: border-box;
+
+  padding: 12px 14px;
+
+  border: 1px solid #ddd;
+
+  border-radius: 8px;
+
+  font-size: 14px;
+
+  outline: none;
+}
+
+
+.category-modal input:focus {
+  border-color: #d88aa8;
+}
+
+
+/* Error */
+
+.category-error {
+  margin: 7px 0 0;
+
+  color: #d93025;
+
+  font-size: 13px;
+}
+
+
+/* Buttons */
+
+.modal-buttons {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 10px;
+
+  margin-top: 25px;
+}
+
+
+.modal-buttons button {
+  padding: 10px 18px;
+
+  border-radius: 8px;
+
+  font-size: 14px;
+
+  cursor: pointer;
+}
+
+
+/* Cancel */
+
+.modal-cancel-button {
+  background: #f5f5f5;
+
+  border: 1px solid #ddd;
+
+  color: #555;
+}
+
+
+.modal-cancel-button:hover {
+  background: #eaeaea;
+}
+
+
+/* Add */
+
+.modal-add-button {
+  background: #d88aa8;
+
+  border: none;
+
+  color: white;
+}
+
+
+.modal-add-button:hover {
+  background: #c87596;
+}
+
+
+.modal-buttons button:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}
+
+.delete-confirm-button {
+  padding: 10px 18px;
+
+  border: none;
+
+  border-radius: 8px;
+
+  background: #d9534f;
+
+  color: white;
+
+  font-size: 14px;
+
+  cursor: pointer;
+}
+
+.delete-confirm-button:hover {
+  background: #c9302c;
+}
+
+.delete-confirm-button:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}

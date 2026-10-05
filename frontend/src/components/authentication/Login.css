@@ -1,0 +1,472 @@
+
+/* ======================== LOGIN CONTAINER ======================== */
+
+.login-container {
+  min-height: 100vh;
+
+  display: flex;
+
+  background: #f7eee9;
+}
+
+
+/* ======================== LEFT BANNER ======================== */
+
+.login-banner {
+  width: 50%;
+
+  position: relative;
+
+  overflow: hidden;
+}
+
+.banner-image {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+
+  display: block;
+}
+
+.banner-overlay {
+  position: absolute;
+  inset: 0;
+
+  background: rgba(67, 47, 50, 0.28);
+
+  display: flex;
+  align-items: flex-end;
+
+  padding: 50px;
+}
+
+.banner-branding {
+  color: white;
+}
+
+.banner-branding h4 {
+  margin: 0 0 8px;
+
+  font-family: Georgia, serif;
+
+  font-size: 25px;
+
+  letter-spacing: 3px;
+}
+
+.banner-branding p {
+  margin: 0;
+
+  font-size: 13px;
+
+  letter-spacing: 1px;
+}
+
+
+/* ======================== RIGHT FORM SECTION ======================== */
+
+.login-form-container {
+  width: 50%;
+
+  min-height: 100vh;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 40px 30px;
+
+  background: #fffaf7;
+}
+
+.form-wrapper {
+  width: 100%;
+
+  max-width: 420px;
+}
+
+
+/* ======================== BRAND HEADER ======================== */
+
+.brand-header {
+  text-align: center;
+
+  margin-bottom: 32px;
+}
+
+.brand-logo {
+  margin: 0 0 25px;
+
+  color: #8f5360;
+
+  font-family: Georgia, serif;
+
+  font-size: 25px;
+
+  letter-spacing: 4px;
+}
+
+.form-title {
+  margin: 0 0 10px;
+
+  color: #432f32;
+
+  font-family: Georgia, serif;
+
+  font-size: 30px;
+
+  font-weight: 500;
+}
+
+.form-subtitle {
+  margin: 0;
+
+  color: #806c6d;
+
+  font-size: 13px;
+
+  line-height: 1.6;
+}
+
+
+/* ======================== LOGIN FORM ======================== */
+
+.login-form {
+  width: 100%;
+}
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.input-group label {
+  display: block;
+
+  margin-bottom: 8px;
+
+  color: #654e50;
+
+  font-size: 11px;
+
+  font-weight: 600;
+
+  letter-spacing: 1px;
+}
+
+.input-group input {
+  width: 100%;
+
+  box-sizing: border-box;
+
+  padding: 13px 14px;
+
+  border: 1px solid #d9c7c2;
+
+  border-radius: 7px;
+
+  outline: none;
+
+  background: #fffdfb;
+
+  color: #432f32;
+
+  font-size: 14px;
+
+  transition: 0.2s;
+}
+
+.input-group input::placeholder {
+  color: #ad9c9c;
+}
+
+.input-group input:focus {
+  border-color: #a86b78;
+
+  box-shadow: 0 0 0 2px rgba(168, 107, 120, 0.08);
+}
+
+
+/* ======================== PASSWORD ======================== */
+
+.password-input-wrapper {
+  position: relative;
+}
+
+.password-input-wrapper input {
+  padding-right: 45px;
+}
+
+.password-toggle {
+  position: absolute;
+
+  right: 12px;
+  top: 50%;
+
+  transform: translateY(-50%);
+
+  border: none;
+
+  background: transparent;
+
+  cursor: pointer;
+
+  padding: 4px;
+
+  font-size: 17px;
+
+  opacity: 0.65;
+}
+
+.password-toggle:hover {
+  opacity: 1;
+}
+
+
+/* ======================== INPUT ERRORS ======================== */
+
+.input-error {
+  margin: 6px 0 0;
+
+  color: #b85c68;
+
+  font-size: 12px;
+
+  line-height: 1.4;
+}
+
+.general-error {
+  margin-bottom: 15px;
+
+  text-align: center;
+}
+
+
+/* ======================== FORGOT PASSWORD ======================== */
+
+.forgot-password-wrapper {
+  display: flex;
+
+  justify-content: flex-end;
+
+  margin-top: -5px;
+
+  margin-bottom: 22px;
+}
+
+.forgot-password-link {
+  color: #8f5360;
+
+  font-size: 12px;
+
+  text-decoration: none;
+
+  transition: 0.2s;
+}
+
+.forgot-password-link:hover {
+  color: #6f3e49;
+
+  text-decoration: underline;
+}
+
+
+/* ======================== LOGIN BUTTON ======================== */
+
+.submit-btn {
+  width: 100%;
+
+  padding: 14px;
+
+  border: none;
+
+  border-radius: 7px;
+
+  background: #8f5360;
+
+  color: white;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  letter-spacing: 1px;
+
+  cursor: pointer;
+
+  transition: 0.25s;
+}
+
+.submit-btn:hover {
+  background: #74404c;
+}
+
+.submit-btn:disabled {
+  background: #c5aeb1;
+
+  cursor: not-allowed;
+}
+
+
+/* ======================== REGISTER FOOTER ======================== */
+
+.form-footer {
+  margin-top: 22px;
+
+  text-align: center;
+}
+
+.form-footer p {
+  margin: 0;
+
+  color: #806c6d;
+
+  font-size: 13px;
+}
+
+.login-link {
+  color: #8f5360;
+
+  font-weight: 600;
+
+  text-decoration: none;
+}
+
+.login-link:hover {
+  text-decoration: underline;
+}
+
+
+/* ======================== DIVIDER ======================== */
+
+.auth-divider {
+  display: flex;
+
+  align-items: center;
+
+  gap: 15px;
+
+  margin: 25px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+
+  flex: 1;
+
+  height: 1px;
+
+  background: #dfd0cc;
+}
+
+.auth-divider span {
+  color: #a28e8e;
+
+  font-size: 11px;
+
+  letter-spacing: 1px;
+}
+
+
+/* ======================== GOOGLE LOGIN ======================== */
+
+.social-auth-wrapper {
+  display: flex;
+
+  justify-content: center;
+
+  width: 100%;
+}
+
+.social-auth-wrapper > div {
+  width: 100%;
+
+  display: flex;
+
+  justify-content: center;
+}
+
+
+/* ======================== RESPONSIVE ======================== */
+
+@media (max-width: 900px) {
+
+  .login-banner {
+    width: 40%;
+  }
+
+  .login-form-container {
+    width: 60%;
+  }
+
+  .banner-overlay {
+    padding: 30px;
+  }
+
+  .banner-branding h4 {
+    font-size: 20px;
+  }
+
+}
+
+
+@media (max-width: 700px) {
+
+  .login-container {
+    display: block;
+  }
+
+  .login-banner {
+    width: 100%;
+
+    height: 220px;
+  }
+
+  .login-form-container {
+    width: 100%;
+
+    min-height: calc(100vh - 220px);
+
+    padding: 35px 22px;
+
+    box-sizing: border-box;
+  }
+
+  .banner-overlay {
+    padding: 25px;
+  }
+
+  .banner-branding h4 {
+    font-size: 19px;
+
+    letter-spacing: 2px;
+  }
+
+  .banner-branding p {
+    font-size: 11px;
+  }
+
+}
+
+
+@media (max-width: 450px) {
+
+  .login-form-container {
+    padding: 30px 18px;
+  }
+
+  .form-title {
+    font-size: 26px;
+  }
+
+  .form-subtitle {
+    font-size: 12px;
+  }
+
+  .brand-logo {
+    font-size: 22px;
+  }
+
+}

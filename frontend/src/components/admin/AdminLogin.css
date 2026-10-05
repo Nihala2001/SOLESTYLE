@@ -1,0 +1,177 @@
+
+/* ================= ADMIN LOGIN PAGE ================= */
+
+.admin-login-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f7eee9;
+  padding: 20px;
+}
+
+
+/* ================= ADMIN LOGIN CARD ================= */
+
+.admin-login-card {
+  width: 100%;
+  max-width: 450px;
+  background: #ffffff;
+  padding: 45px;
+  border-radius: 12px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+}
+
+
+/* ================= HEADING ================= */
+
+.admin-login-heading {
+  text-align: center;
+  margin-bottom: 35px;
+}
+
+.admin-login-heading p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #b76e79;
+}
+
+.admin-login-heading h2 {
+  margin: 0 0 10px;
+  font-size: 28px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.admin-login-heading span {
+  display: block;
+  font-size: 14px;
+  color: #777777;
+  line-height: 1.5;
+}
+
+
+/* ================= FORM FIELD ================= */
+
+.admin-login-field {
+  margin-bottom: 22px;
+}
+
+.admin-login-field label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #444444;
+}
+
+.admin-login-field input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #dddddd;
+  border-radius: 6px;
+  outline: none;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.admin-login-field input:focus {
+  border-color: #b76e79;
+}
+
+
+/* ================= PASSWORD ================= */
+
+.admin-password-wrapper {
+  position: relative;
+}
+
+.admin-password-wrapper input {
+  padding-right: 70px;
+}
+
+.admin-show-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #b76e79;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+
+/* ================= FIELD ERROR ================= */
+
+.admin-login-error {
+  margin: 6px 0 0;
+  color: #d9534f;
+  font-size: 12px;
+}
+
+
+/* ================= GENERAL ERROR ================= */
+
+.admin-login-general-error {
+  margin: 0 0 18px;
+  padding: 10px;
+  text-align: center;
+  background: #fff1f1;
+  border-radius: 5px;
+  color: #d9534f;
+  font-size: 13px;
+}
+
+
+/* ================= LOGIN BUTTON ================= */
+
+.admin-login-button {
+  width: 100%;
+  height: 50px;
+  border: none;
+  border-radius: 6px;
+  background: #b76e79;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.admin-login-button:hover {
+  background: #9f5c67;
+}
+
+.admin-login-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 500px) {
+
+  .admin-login-page {
+    padding: 15px;
+  }
+
+  .admin-login-card {
+    padding: 30px 22px;
+  }
+
+  .admin-login-heading h2 {
+    font-size: 24px;
+  }
+
+}
+

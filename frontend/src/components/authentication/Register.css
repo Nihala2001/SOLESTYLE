@@ -1,0 +1,270 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+
+/* Main Page Layout */
+.register-container {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: #FAF5F1;
+  color: #332B2B;
+}
+
+/* Left Image Banner Section */
+.register-banner {
+  position: relative;
+  flex: 1;
+  display: none;
+  overflow: hidden;
+}
+
+@media (min-width: 900px) {
+  .register-banner {
+    display: block;
+  }
+}
+
+.banner-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.banner-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(216, 168, 168, 0.15) 0%,
+    rgba(40, 25, 25, 0.6) 100%
+  );
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 3rem;
+  box-sizing: border-box;
+}
+
+.banner-branding h4 {
+  font-size: 0.85rem;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #F8ECEE;
+  margin: 0 0 0.25rem 0;
+  font-weight: 600;
+}
+
+.banner-branding p {
+  font-size: 0.8rem;
+  color: #E2D2D2;
+  margin: 0;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+}
+
+/* Right Form Section */
+.register-form-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2.5rem 1.5rem;
+  background-color: #FAF5F1;
+}
+
+.form-wrapper {
+  width: 100%;
+  max-width: 410px;
+}
+
+/* Header Text */
+.brand-header {
+  margin-bottom: 1.8rem;
+}
+
+.brand-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #2D2224;
+  margin: 0 0 1rem 0;
+}
+
+.form-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.85rem;
+  font-weight: 600;
+  color: #2D2224;
+  margin: 0 0 0.4rem 0;
+}
+
+.form-subtitle {
+  font-size: 0.85rem;
+  color: #8C7A7A;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Form Controls */
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.input-group label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: #6E5C5E;
+}
+
+.input-group label span {
+  color: #A89597;
+  font-weight: 400;
+}
+
+.input-group input,
+.input-group select {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #E6D8D8;
+  border-radius: 4px;
+  background-color: #FFFFFF;
+  font-size: 0.85rem;
+  color: #2D2224;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-group input::placeholder {
+  color: #C0B2B4;
+  font-size: 0.82rem;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+  border-color: #D4A3A3; /* Warm Dusty Rose */
+  box-shadow: 0 0 0 3px rgba(212, 163, 163, 0.18);
+}
+
+/* Password Toggle Wrapper */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #A89597;
+  font-size: 0.85rem;
+  padding: 0.2rem;
+}
+
+.password-toggle:hover {
+  color: #6E5C5E;
+}
+
+/* Submit Button */
+.submit-btn {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.85rem;
+  background-color: #2D2224; /* Soft Black Tone */
+  color: #FAF5F1;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: background-color 0.25s ease, transform 0.1s ease;
+}
+
+.submit-btn:hover {
+  background-color: #B57B7B; /* Warm Pink Hover State */
+}
+
+.submit-btn:active {
+  transform: scale(0.99);
+}
+
+/* Footer Link */
+.form-footer {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.form-footer p {
+  font-size: 0.82rem;
+  color: #8C7A7A;
+  margin: 0;
+}
+
+.login-link {
+  color: #2D2224;
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: 0.25rem;
+}
+
+.login-link:hover {
+  color: #B57B7B;
+  text-decoration: underline;
+}
+/* Social Auth Button Styling */
+.social-auth-wrapper {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 1.2rem;
+}
+
+/* Divider with "OR" */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.2rem 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #E6D8D8;
+}
+
+.auth-divider span {
+  padding: 0 0.8rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #A89597;
+  letter-spacing: 1px;
+}
+.input-error {
+  color: #d32f2f;
+  font-size: 13px;
+  margin-top: 5px;
+  margin-bottom: 0;
+}
+
+.general-error {
+  margin-bottom: 10px;
+}

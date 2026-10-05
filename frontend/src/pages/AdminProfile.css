@@ -1,0 +1,155 @@
+.admin-profile-page {
+  max-width: 900px;
+}
+
+.profile-header {
+  margin-bottom: 25px;
+}
+
+.profile-header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #3d3030;
+}
+
+.profile-header p {
+  margin: 6px 0 0;
+  color: #927d7d;
+  font-size: 13px;
+}
+
+.admin-profile-card {
+  background: white;
+  border: 1px solid #eadbd4;
+  border-radius: 16px;
+  padding: 35px;
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 45px;
+  box-shadow: 0 3px 15px rgba(100, 70, 70, 0.05);
+}
+
+/* PROFILE IMAGE */
+
+.admin-profile-image-section {
+  text-align: center;
+  border-right: 1px solid #eee2dc;
+  padding-right: 35px;
+}
+
+.admin-profile-large-avatar {
+  width: 110px;
+  height: 110px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: #b85c70;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  font-weight: bold;
+}
+
+.admin-profile-image-section h2 {
+  margin: 0;
+  font-size: 19px;
+  color: #403333;
+}
+
+.admin-profile-image-section p {
+  margin-top: 6px;
+  color: #9a8585;
+  font-size: 12px;
+}
+
+/* FORM */
+
+.admin-profile-form {
+  padding-top: 5px;
+}
+
+.admin-profile-field {
+  margin-bottom: 22px;
+}
+
+.admin-profile-field label {
+  display: block;
+  margin-bottom: 8px;
+  color: #806d6d;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.admin-profile-field input {
+  width: 100%;
+  height: 44px;
+  padding: 0 13px;
+  border: 1px solid #decfca;
+  border-radius: 8px;
+  outline: none;
+  background: #fffaf7;
+  color: #493b3b;
+  font-size: 13px;
+}
+
+.admin-profile-field input:focus {
+  border-color: #b85c70;
+}
+
+.admin-profile-field input:disabled {
+  background: #f5efeb;
+  color: #8e7b7b;
+  cursor: not-allowed;
+}
+
+/* BUTTONS */
+
+.admin-profile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.admin-profile-actions button {
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cancel-profile-button {
+  background: #f1e6e0;
+  color: #66504a;
+}
+
+.save-profile-button {
+  background: #b85c70;
+  color: white;
+}
+
+.save-profile-button:hover {
+  background: #a94f64;
+}
+
+.cancel-profile-button:hover {
+  opacity: 0.8;
+}
+
+@media (max-width: 700px) {
+  .admin-profile-card {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+
+  .admin-profile-image-section {
+    border-right: none;
+    border-bottom: 1px solid #eee2dc;
+    padding-right: 0;
+    padding-bottom: 25px;
+  }
+}

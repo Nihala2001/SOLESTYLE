@@ -1,0 +1,95 @@
+
+.notification-modal-overlay {
+  position: fixed;
+  inset: 0;
+
+  background: rgba(67, 47, 50, 0.45);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 20px;
+
+  z-index: 9999;
+}
+
+.notification-modal {
+  width: 100%;
+  max-width: 380px;
+
+  padding: 35px 30px;
+
+  background: #fffaf7;
+
+  border-radius: 14px;
+
+  text-align: center;
+
+  box-shadow: 0 12px 40px rgba(67, 47, 50, 0.2);
+
+  animation: notificationModalShow 0.25s ease;
+}
+
+.notification-modal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 18px;
+}
+
+.notification-modal-icon.success {
+  color: #7c9b80;
+}
+
+.notification-modal-icon.error {
+  color: #b85c68;
+}
+
+.notification-modal-icon.info {
+  color: #8f5360;
+}
+
+.notification-modal h2 {
+  margin: 0 0 10px;
+
+  color: #432f32;
+
+  font-family: Georgia, serif;
+
+  font-size: 25px;
+}
+
+.notification-modal p {
+  margin: 0;
+
+  color: #705b5d;
+
+  font-size: 14px;
+
+  line-height: 1.6;
+}
+
+@keyframes notificationModalShow {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 500px) {
+  .notification-modal {
+    max-width: 340px;
+    padding: 30px 22px;
+  }
+
+  .notification-modal h2 {
+    font-size: 22px;
+  }
+}
