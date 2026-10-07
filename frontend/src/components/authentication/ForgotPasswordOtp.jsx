@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import NotificationModal from "../common/NotificationModal";
+import {  verifyForgotPasswordOtp, resendForgotPasswordOtp, } from "../../api/services/authServices";
 import "./ForgotPasswordOtp.css";
 
 function ForgotPasswordOtp() {
@@ -76,26 +77,10 @@ function ForgotPasswordOtp() {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        "http://localhost:5001/api/auth/verify-forgot-password-otp",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            otp,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Invalid OTP.");
-        return;
-      }
+        await verifyForgotPasswordOtp({
+       email,
+       otp,
+       });
 
       // OTP verified successfully
       showNotificationMessage(
@@ -104,21 +89,20 @@ function ForgotPasswordOtp() {
         "success"
       );
 
-    } catch (error) {
-      console.error(
-        "Forgot password OTP error:",
-        error
-      );
+    }catch (error) {
+  console.error(
+    "Forgot password OTP error:",
+    error
+  );
 
-      showNotificationMessage(
-        "Verification Failed",
-        "Something went wrong. Please try again.",
-        "error"
-      );
+  setError(
+    error.response?.data?.message ||
+    "Invalid OTP."
+  );
 
-    } finally {
-      setLoading(false);
-    }
+} finally {
+  setLoading(false);
+}
   };
 
   // ================= RESEND OTP =================
@@ -134,27 +118,7 @@ function ForgotPasswordOtp() {
     try {
       setResending(true);
 
-      const response = await fetch(
-        "http://localhost:5001/api/auth/forgot-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(
-          data.message || "Failed to resend OTP."
-        );
-        return;
-      }
+     await resendForgotPasswordOtp(email);
 
       // New OTP sent
       showNotificationMessage(
@@ -163,21 +127,20 @@ function ForgotPasswordOtp() {
         "success"
       );
 
-    } catch (error) {
-      console.error(
-        "Resend OTP error:",
-        error
-      );
+    }catch (error) {
+  console.error(
+    "Resend OTP error:",
+    error
+  );
 
-      showNotificationMessage(
-        "OTP Failed",
-        "Something went wrong. Please try again.",
-        "error"
-      );
+  setError(
+    error.response?.data?.message ||
+    "Failed to resend OTP."
+  );
 
-    } finally {
-      setResending(false);
-    }
+} finally {
+  setResending(false);
+}
   };
 
   // ================= UI =================

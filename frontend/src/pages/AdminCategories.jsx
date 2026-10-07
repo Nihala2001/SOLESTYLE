@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../components/admin/AdminLayout";
+import {
+  getAdminCategories,
+  addAdminCategory,
+  updateAdminCategory,
+  deleteAdminCategory,
+  activateAdminCategory,
+} from "../api/services/adminCategoryService";
 import "./AdminCategories.css";
 
 function AdminCategories() {
@@ -44,258 +51,172 @@ function AdminCategories() {
   const [deleting, setDeleting] = useState(false);
 
 
-  // ================= FETCH CATEGORIES =================
+  // ...................FETCH CATEGORIES..............
 
   const fetchCategories = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const adminToken = localStorage.getItem("adminToken");
+    const data = await getAdminCategories(
+      searchQuery,
+      page,
+      5
+    );
 
-      const response = await fetch(
-        `http://localhost:5001/api/admin/categories?search=${encodeURIComponent(
-          searchQuery
-        )}&page=${page}&limit=5`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${adminToken}`,
-          },
-        }
-      );
+    setCategories(data.categories || []);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to fetch categories"
-        );
+    setPagination(
+      data.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalCategories: 0,
       }
-
-      setCategories(data.categories || []);
-
-      setPagination(
-        data.pagination || {
-          currentPage: 1,
-          totalPages: 1,
-          totalCategories: 0,
-        }
-      );
-
-    } catch (error) {
-      console.error(
-        "Fetch categories error:",
-        error
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    );
+  } catch (error) {
+    console.error(
+      "Fetch categories error:",
+      error
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
 
-  // ================= ADD CATEGORY =================
+  //...............ADD CATEGORY.....................
 
   const handleAddCategory = async () => {
-    const trimmedName = categoryName.trim();
+  const trimmedName = categoryName.trim();
 
-    if (!trimmedName) {
-      setError("Category name is required");
-      return;
-    }
+  if (!trimmedName) {
+    setError("Category name is required");
+    return;
+  }
 
-    try {
-      setAdding(true);
-      setError("");
+  try {
+    setAdding(true);
+    setError("");
 
-      const adminToken =
-        localStorage.getItem("adminToken");
+    const data = await addAdminCategory({
+      name: trimmedName,
+    });
 
-      const response = await fetch(
-        "http://localhost:5001/api/admin/categories",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${adminToken}`,
-          },
-          body: JSON.stringify({
-            name: trimmedName,
-          }),
-        }
-      );
+    // Close modal
+    setShowAddModal(false);
 
-      const data = await response.json();
+    // Clear form
+    setCategoryName("");
+    setError("");
 
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to add category"
-        );
-      }
+    // Reset search and page
+    setSearch("");
+    setSearchQuery("");
+    setPage(1);
 
-      // Close modal
-      setShowAddModal(false);
+  } catch (error) {
+    setError(
+      error.response?.data?.message ||
+        "Failed to add category"
+    );
+  } finally {
+    setAdding(false);
+  }
+};
 
-      // Clear form
-      setCategoryName("");
-      setError("");
-
-      // Reset search and page
-      setSearch("");
-      setSearchQuery("");
-      setPage(1);
-
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setAdding(false);
-    }
-  };
-
-
-  // ================= EDIT CATEGORY =================
+  // ..................EDIT CATEGORY....................
 
   const handleEditCategory = async () => {
-    const trimmedName = editCategoryName.trim();
+  const trimmedName = editCategoryName.trim();
 
-    if (!trimmedName) {
-      setEditError("Category name is required");
-      return;
-    }
+  if (!trimmedName) {
+    setEditError("Category name is required");
+    return;
+  }
 
-    if (!editingCategory) {
-      return;
-    }
+  if (!editingCategory) {
+    return;
+  }
 
-    try {
-      setUpdating(true);
-      setEditError("");
+  try {
+    setUpdating(true);
+    setEditError("");
 
-      const adminToken =
-        localStorage.getItem("adminToken");
-
-      const response = await fetch(
-        `http://localhost:5001/api/admin/categories/${editingCategory._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${adminToken}`,
-          },
-          body: JSON.stringify({
-            name: trimmedName,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to update category"
-        );
+    await updateAdminCategory(
+      editingCategory._id,
+      {
+        name: trimmedName,
       }
+    );
 
-      // Close modal
-      setShowEditModal(false);
+    // Close modal
+    setShowEditModal(false);
 
-      // Clear edit data
-      setEditingCategory(null);
-      setEditCategoryName("");
-      setEditError("");
+    // Clear edit data
+    setEditingCategory(null);
+    setEditCategoryName("");
+    setEditError("");
 
-      // Refresh list
-      fetchCategories();
+    // Refresh list
+    fetchCategories();
 
-    } catch (error) {
-      setEditError(error.message);
-    } finally {
-      setUpdating(false);
-    }
-  };
+  } catch (error) {
+    setEditError(
+      error.response?.data?.message ||
+        "Failed to update category"
+    );
+  } finally {
+    setUpdating(false);
+  }
+};
 
 
-  // ================= DELETE CATEGORY =================
+  //.......................DELETE CATEGORY...................
 
   const handleDeleteCategory = async () => {
-    if (!deletingCategory) {
-      return;
-    }
+  if (!deletingCategory) {
+    return;
+  }
 
-    try {
-      setDeleting(true);
-      setDeleteError("");
+  try {
+    setDeleting(true);
+    setDeleteError("");
 
-      const adminToken =
-        localStorage.getItem("adminToken");
+    await deleteAdminCategory(
+      deletingCategory._id
+    );
 
-      const response = await fetch(
-        `http://localhost:5001/api/admin/categories/${deletingCategory._id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${adminToken}`,
-          },
-        }
-      );
+    // Close modal
+    setShowDeleteModal(false);
 
-      const data = await response.json();
+    // Clear delete data
+    setDeletingCategory(null);
+    setDeleteError("");
 
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to delete category"
-        );
-      }
+    // Refresh list
+    fetchCategories();
 
-      // Close modal
-      setShowDeleteModal(false);
+  } catch (error) {
+    console.error(
+      "Delete category error:",
+      error
+    );
 
-      // Clear delete data
-      setDeletingCategory(null);
-      setDeleteError("");
+    setDeleteError(
+      error.response?.data?.message ||
+        "Failed to delete category"
+    );
 
-      // Refresh list
-      fetchCategories();
-
-    } catch (error) {
-      console.error(
-        "Delete category error:",
-        error
-      );
-
-      setDeleteError(error.message);
-
-    } finally {
-      setDeleting(false);
-    }
-  };
-
+  } finally {
+    setDeleting(false);
+  }
+};
   //...handle category reactivate............//
 
   const handleActivateCategory = async (categoryId) => {
   try {
-    const adminToken =
-      localStorage.getItem("adminToken");
-
-    const response = await fetch(
-      `http://localhost:5001/api/admin/categories/${categoryId}/activate`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data.message || "Failed to activate category"
-      );
-    }
+    await activateAdminCategory(categoryId);
 
     fetchCategories();
-
   } catch (error) {
     console.error(
       "Activate category error:",
@@ -330,7 +251,7 @@ function AdminCategories() {
 
 
   return (
-    <AdminLayout title="Categories">
+    < AdminLayout title="Categories">
 
       {/* ================= HEADER ================= */}
 

@@ -7,13 +7,18 @@ const {
 
 const getUsers = async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, page = 1, limit = 5 } = req.query;
 
-    const users = await getAllUsers(search);
+    const result = await getAllUsers(
+      search,
+      Number(page),
+      Number(limit)
+    );
 
     res.status(200).json({
       success: true,
-      users,
+      users: result.users,
+      pagination: result.pagination,
     });
   } catch (error) {
     console.error("Get users error:", error);

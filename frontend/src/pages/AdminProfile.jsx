@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../components/admin/AdminLayout";
+import NotificationModal from "../components/common/NotificationModal";
+import {
+  getAdminProfile,
+  updateAdminProfile,
+} from "../api/services/adminService";
 import "./AdminProfile.css";
 
 function AdminProfile() {
@@ -12,28 +17,44 @@ function AdminProfile() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [notification, setNotification] = useState({
+    show: false,
+    title: "",
+    message: "",
+    type: "success",
+  });
+  const [nameError, setNameError] = useState("");
+
+  //helper
+  const showNotification = (title, message, type = "success") => {
+    setNotification({
+      show: true,
+      title,
+      message,
+      type,
+    });
+  };
+
+  const closeNotification = () => {
+    setNotification((prev) => ({
+      ...prev,
+      show: false,
+    }));
+  };
 
   // ================= GET ADMIN PROFILE =================
 
   useEffect(() => {
     const fetchAdminProfile = async () => {
       try {
-        const token = localStorage.getItem("adminToken");
+        const data = await getAdminProfile();
 
-        const response = await fetch(
-          "http://localhost:5001/api/admin/profile",
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          alert(data.message || "Failed to load profile");
+        if (!data.success) {
+          showNotification(
+            "Failed to Load Profile",
+            data.message || "Failed to load profile",
+            "error",
+          );
           return;
         }
 
@@ -42,12 +63,16 @@ function AdminProfile() {
         setProfileImage(data.admin.profileImage || []);
       } catch (error) {
         console.error("Get admin profile error:", error);
-        alert("Something went wrong");
+
+        showNotification(
+          "Something Went Wrong",
+          error.response?.data?.message || "Something went wrong",
+          "error",
+        );
       } finally {
         setLoading(false);
       }
     };
-
     fetchAdminProfile();
   }, []);
 
@@ -55,57 +80,51 @@ function AdminProfile() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      alert("Name is required");
+      setNameError("Name is required");
       return;
     }
 
-    if (
-      name.trim().length < 2 ||
-      name.trim().length > 50
-    ) {
-      alert("Name must be between 2 and 50 characters");
+    if (name.trim().length < 2 || name.trim().length > 50) {
+      setNameError("Name must be between 2 and 50 characters");
       return;
     }
 
     try {
       setSaving(true);
 
-      const token = localStorage.getItem("adminToken");
+      const data = await updateAdminProfile({
+        name: name.trim(),
+        profileImage,
+      });
 
-      const response = await fetch(
-        "http://localhost:5001/api/admin/profile",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            name: name.trim(),
-            profileImage,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.message || "Failed to update profile");
+      if (!data.success) {
+        showNotification(
+          "Update Failed",
+          data.message || "Failed to update profile",
+          "error",
+        );
         return;
       }
 
       // Update localStorage
-      localStorage.setItem(
-        "admin",
-        JSON.stringify(data.admin)
+      localStorage.setItem("admin", JSON.stringify(data.admin));
+
+      showNotification(
+        "Profile Updated",
+        "Profile updated successfully",
+        "success",
       );
 
-      alert("Profile updated successfully");
-
-      navigate("/admin/dashboard");
+      setTimeout(() => {
+        navigate("/admin/dashboard");
+      }, 1500);
     } catch (error) {
       console.error("Update admin profile error:", error);
-      alert("Something went wrong");
+      showNotification(
+        "Something Went Wrong",
+        error.response?.data?.message || "Something went wrong",
+        "error",
+      );
     } finally {
       setSaving(false);
     }
@@ -116,9 +135,7 @@ function AdminProfile() {
   if (loading) {
     return (
       <AdminLayout title="Admin Profile">
-        <div className="admin-profile-loading">
-          Loading profile...
-        </div>
+        <div className="admin-profile-loading">Loading profile...</div>
       </AdminLayout>
     );
   }
@@ -127,81 +144,70 @@ function AdminProfile() {
 
   return (
     <AdminLayout title="Admin Profile">
-
+      <NotificationModal
+        isOpen={notification.show}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+        onClose={closeNotification}
+      />
       <div className="admin-profile-page">
-
         <div className="profile-header">
           <div>
             <h1>Admin Profile</h1>
-            <p>
-              Manage your administrator account.
-            </p>
+            <p>Manage your administrator account.</p>
           </div>
         </div>
 
         <div className="admin-profile-card">
-
           {/* PROFILE IMAGE */}
 
           <div className="admin-profile-image-section">
-
             <div className="admin-profile-large-avatar">
-              {name
-                ? name.charAt(0).toUpperCase()
-                : "A"}
+              {name ? name.charAt(0).toUpperCase() : "A"}
             </div>
 
             <h2>{name || "Admin"}</h2>
 
             <p>Administrator</p>
-
           </div>
 
           {/* PROFILE DETAILS */}
 
           <div className="admin-profile-form">
-
             {/* NAME */}
 
             <div className="admin-profile-field">
-
               <label>FULL NAME</label>
 
               <input
                 type="text"
                 value={name}
-                onChange={(e) =>
-                  setName(e.target.value)
-                }
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameError("");
+                }}
                 placeholder="Enter your name"
               />
 
+              {nameError && <p className="admin-profile-error">{nameError}</p>}
             </div>
 
             {/* EMAIL */}
 
             <div className="admin-profile-field">
-
               <label>EMAIL ADDRESS</label>
 
-              <input
-                type="email"
-                value={email}
-                disabled
-              />
-
+              <input type="email" value={email} disabled />
             </div>
 
             {/* BUTTONS */}
 
             <div className="admin-profile-actions">
-
               <button
                 type="button"
                 className="cancel-profile-button"
-                onClick={() =>
-                  navigate("/admin/dashboard")
-                }
+                onClick={() => navigate("/admin/dashboard")}
                 disabled={saving}
               >
                 Cancel
@@ -213,19 +219,12 @@ function AdminProfile() {
                 onClick={handleSave}
                 disabled={saving}
               >
-                {saving
-                  ? "Saving..."
-                  : "Save Changes"}
+                {saving ? "Saving..." : "Save Changes"}
               </button>
-
             </div>
-
           </div>
-
         </div>
-
       </div>
-
     </AdminLayout>
   );
 }

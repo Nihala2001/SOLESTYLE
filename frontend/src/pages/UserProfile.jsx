@@ -20,6 +20,22 @@ import {
 import NotificationModal from "../components/common/NotificationModal";
 import ConfirmationModal from "../components/common/ConfirmationModal";
 
+import {
+  getProfile,
+  updateProfile,
+  updateProfileImage,
+  removeProfileImage,
+  sendEmailChangeOtp,
+  verifyEmailChangeOtp,
+  sendPasswordChangeOtp,
+  verifyPasswordChangeOtp,
+  getAddresses,
+  addAddress,
+  updateAddress,
+  deleteAddress,
+  setDefaultAddress,
+} from "../api/services/userService";
+
 import "./UserProfile.css";
 
 function UserProfile() {
@@ -102,11 +118,7 @@ function UserProfile() {
 
   // ================= NOTIFICATION FUNCTIONS =================
 
-  const showNotificationMessage = (
-    title,
-    message,
-    type = "success"
-  ) => {
+  const showNotificationMessage = (title, message, type = "success") => {
     setNotificationTitle(title);
     setNotificationMessage(message);
     setNotificationType(type);
@@ -123,7 +135,7 @@ function UserProfile() {
     title,
     message,
     action,
-    confirmText = "Confirm"
+    confirmText = "Confirm",
   ) => {
     setConfirmationTitle(title);
     setConfirmationMessage(message);
@@ -147,31 +159,13 @@ function UserProfile() {
     setConfirmationAction(null);
   };
 
-  // ================= GET USER PROFILE =================
+  // ..............GET USER PROFILE ...................//
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await getProfile();
 
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(
-        "http://localhost:5001/api/user/profile",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         setUser(data.user);
       } else {
         console.error(data.message);
@@ -179,7 +173,7 @@ function UserProfile() {
         showNotificationMessage(
           "Profile Error",
           data.message || "Unable to load profile.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
@@ -187,17 +181,16 @@ function UserProfile() {
 
       showNotificationMessage(
         "Profile Error",
-        "Something went wrong while loading your profile.",
-        "error"
+        error.response?.data?.message ||
+          "Something went wrong while loading your profile.",
+        "error",
       );
     } finally {
       setLoading(false);
     }
   };
 
-  // =========================================================
-  // EDIT PROFILE
-  // =========================================================
+  //...................... EDIT PROFILE.............//
 
   const openEditProfile = () => {
     setEditName(user.name || "");
@@ -211,7 +204,7 @@ function UserProfile() {
       showNotificationMessage(
         "Invalid Name",
         "Please enter your name.",
-        "error"
+        "error",
       );
       return;
     }
@@ -219,38 +212,24 @@ function UserProfile() {
     setFormLoading(true);
 
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await updateProfile({
+        name: editName.trim(),
+      });
 
-      const response = await fetch(
-        "http://localhost:5001/api/user/profile",
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: editName.trim(),
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         setUser(data.user);
         setShowEditProfile(false);
 
         showNotificationMessage(
           "Profile Updated",
           "Your profile has been updated successfully.",
-          "success"
+          "success",
         );
       } else {
         showNotificationMessage(
           "Update Failed",
           data.message || "Unable to update your profile.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
@@ -258,22 +237,19 @@ function UserProfile() {
 
       showNotificationMessage(
         "Something Went Wrong",
-        "Unable to update your profile. Please try again.",
-        "error"
+        error.response?.data?.message ||
+          "Unable to update your profile. Please try again.",
+        "error",
       );
     } finally {
       setFormLoading(false);
     }
   };
 
-  // =========================================================
-  // CHANGE PROFILE PHOTO
-  // =========================================================
+  //........... CHANGE PROFILE PHOTO...............//
 
   const openImageSelector = () => {
-    const imageInput = document.getElementById(
-      "profile-image-input"
-    );
+    const imageInput = document.getElementById("profile-image-input");
 
     if (imageInput) {
       imageInput.click();
@@ -292,7 +268,7 @@ function UserProfile() {
       showNotificationMessage(
         "Invalid Image",
         "Please select a valid image file.",
-        "error"
+        "error",
       );
 
       e.target.value = "";
@@ -304,7 +280,7 @@ function UserProfile() {
       showNotificationMessage(
         "Image Too Large",
         "Please select an image smaller than 2 MB.",
-        "error"
+        "error",
       );
 
       e.target.value = "";
@@ -323,7 +299,7 @@ function UserProfile() {
     reader.readAsDataURL(file);
   };
 
-  // ================= SAVE PROFILE PHOTO =================
+  // .............SAVE PROFILE PHOTO .............
 
   const handleSaveProfileImage = async () => {
     if (!selectedImage || !imagePreview) {
@@ -333,46 +309,19 @@ function UserProfile() {
     setFormLoading(true);
 
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await updateProfileImage({
+        name: user.name,
+        profileImage: [imagePreview],
+      });
 
-      if (!token) {
-        showNotificationMessage(
-          "Authentication Required",
-          "Please login again to continue.",
-          "error"
-        );
-
-        setFormLoading(false);
-        return;
-      }
-
-      const response = await fetch(
-        "http://localhost:5001/api/user/profile",
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: user.name,
-            profileImage: [imagePreview],
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         setUser(data.user);
 
         setSelectedImage(null);
         setImagePreview(null);
         setShowImageModal(false);
 
-        const imageInput = document.getElementById(
-          "profile-image-input"
-        );
+        const imageInput = document.getElementById("profile-image-input");
 
         if (imageInput) {
           imageInput.value = "";
@@ -381,26 +330,23 @@ function UserProfile() {
         showNotificationMessage(
           "Photo Updated",
           "Your profile photo has been updated successfully.",
-          "success"
+          "success",
         );
       } else {
         showNotificationMessage(
           "Upload Failed",
-          data.message ||
-            "Unable to update your profile photo.",
-          "error"
+          data.message || "Unable to update your profile photo.",
+          "error",
         );
       }
     } catch (error) {
-      console.error(
-        "Profile image update error:",
-        error
-      );
+      console.error("Profile image update error:", error);
 
       showNotificationMessage(
         "Something Went Wrong",
-        "Unable to update your profile photo. Please try again.",
-        "error"
+        error.response?.data?.message ||
+          "Unable to update your profile photo. Please try again.",
+        "error",
       );
     } finally {
       setFormLoading(false);
@@ -418,95 +364,63 @@ function UserProfile() {
     setSelectedImage(null);
     setImagePreview(null);
 
-    const imageInput = document.getElementById(
-      "profile-image-input"
-    );
+    const imageInput = document.getElementById("profile-image-input");
 
     if (imageInput) {
       imageInput.value = "";
     }
   };
 
-  // ================= REMOVE PROFILE PHOTO =================
+  // ............. REMOVE PROFILE PHOTO ...............
 
   const handleRemoveProfileImage = () => {
     showConfirmationMessage(
       "Remove Profile Photo?",
       "Are you sure you want to remove your profile photo?",
-      removeProfileImage,
-      "Remove"
+      handleRemoveImage,
+      "Remove",
     );
   };
 
-  const removeProfileImage = async () => {
+  const handleRemoveImage = async () => {
     setFormLoading(true);
 
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await removeProfileImage({
+        name: user.name,
+        profileImage: [],
+      });
 
-      if (!token) {
-        showNotificationMessage(
-          "Authentication Required",
-          "Please login again to continue.",
-          "error"
-        );
-
-        setFormLoading(false);
-        return;
-      }
-
-      const response = await fetch(
-        "http://localhost:5001/api/user/profile",
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: user.name,
-            profileImage: [],
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         setUser(data.user);
 
         showNotificationMessage(
           "Photo Removed",
           "Your profile photo has been removed successfully.",
-          "success"
+          "success",
         );
       } else {
         showNotificationMessage(
           "Remove Failed",
-          data.message ||
-            "Unable to remove your profile photo.",
-          "error"
+          data.message || "Unable to remove your profile photo.",
+          "error",
         );
       }
     } catch (error) {
-      console.error(
-        "Remove profile image error:",
-        error
-      );
+      console.error("Remove profile image error:", error);
 
       showNotificationMessage(
         "Something Went Wrong",
-        "Unable to remove your profile photo. Please try again.",
-        "error"
+        error.response?.data?.message ||
+          "Unable to remove your profile photo. Please try again.",
+        "error",
       );
     } finally {
       setFormLoading(false);
     }
   };
 
-  // =========================================================
-  // CHANGE EMAIL
-  // =========================================================
+  //..................... CHANGE EMAIL...............//
 
   const openChangeEmail = () => {
     setNewEmail("");
@@ -514,7 +428,6 @@ function UserProfile() {
     setEmailOtpSent(false);
     setShowChangeEmail(true);
   };
-
   const handleSendEmailOtp = async (e) => {
     e.preventDefault();
 
@@ -524,7 +437,7 @@ function UserProfile() {
       showNotificationMessage(
         "Email Required",
         "Please enter your new email address.",
-        "error"
+        "error",
       );
       return;
     }
@@ -535,7 +448,7 @@ function UserProfile() {
       showNotificationMessage(
         "Invalid Email",
         "Please enter a valid email address.",
-        "error"
+        "error",
       );
       return;
     }
@@ -543,50 +456,32 @@ function UserProfile() {
     setFormLoading(true);
 
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await sendEmailChangeOtp(email);
 
-      const response = await fetch(
-        "http://localhost:5001/api/user/change-email/send-otp",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            newEmail: email,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         setNewEmail(email);
         setEmailOtpSent(true);
 
         showNotificationMessage(
           "OTP Sent",
           "OTP has been sent to your new email address.",
-          "success"
+          "success",
         );
       } else {
         showNotificationMessage(
           "Email Change Failed",
           data.message || "Unable to send OTP.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
-      console.error(
-        "Send email OTP error:",
-        error
-      );
+      console.error("Send email OTP error:", error);
 
       showNotificationMessage(
         "Something Went Wrong",
-        "Unable to send OTP. Please try again.",
-        "error"
+        error.response?.data?.message ||
+          "Unable to send OTP. Please try again.",
+        "error",
       );
     } finally {
       setFormLoading(false);
@@ -600,7 +495,7 @@ function UserProfile() {
       showNotificationMessage(
         "Invalid OTP",
         "Please enter a valid 6-digit OTP.",
-        "error"
+        "error",
       );
       return;
     }
@@ -608,26 +503,12 @@ function UserProfile() {
     setFormLoading(true);
 
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await verifyEmailChangeOtp({
+        newEmail: newEmail.trim().toLowerCase(),
+        otp: emailOtp,
+      });
 
-      const response = await fetch(
-        "http://localhost:5001/api/user/change-email/verify-otp",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            newEmail: newEmail.trim().toLowerCase(),
-            otp: emailOtp,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         setUser((previousUser) => ({
           ...previousUser,
           email: newEmail.trim().toLowerCase(),
@@ -641,25 +522,23 @@ function UserProfile() {
         showNotificationMessage(
           "Email Changed",
           "Your email address has been changed successfully.",
-          "success"
+          "success",
         );
       } else {
         showNotificationMessage(
           "Verification Failed",
           data.message || "Invalid OTP.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
-      console.error(
-        "Verify email OTP error:",
-        error
-      );
+      console.error("Verify email OTP error:", error);
 
       showNotificationMessage(
         "Something Went Wrong",
-        "Unable to verify OTP. Please try again.",
-        "error"
+        error.response?.data?.message ||
+          "Unable to verify OTP. Please try again.",
+        "error",
       );
     } finally {
       setFormLoading(false);
@@ -673,10 +552,7 @@ function UserProfile() {
     setEmailOtpSent(false);
   };
 
-  // =========================================================
-  // CHANGE PASSWORD
-  // =========================================================
-
+  //...............change password.............//
   const openChangePassword = () => {
     setCurrentPassword("");
     setNewPassword("");
@@ -685,19 +561,14 @@ function UserProfile() {
     setPasswordOtpSent(false);
     setShowChangePassword(true);
   };
-
   const handleSendPasswordOtp = async (e) => {
     e.preventDefault();
 
-    if (
-      !currentPassword ||
-      !newPassword ||
-      !confirmPassword
-    ) {
+    if (!currentPassword || !newPassword || !confirmPassword) {
       showNotificationMessage(
         "Missing Information",
         "Please fill in all password fields.",
-        "error"
+        "error",
       );
       return;
     }
@@ -706,7 +577,7 @@ function UserProfile() {
       showNotificationMessage(
         "Password Mismatch",
         "New password and confirm password do not match.",
-        "error"
+        "error",
       );
       return;
     }
@@ -714,51 +585,35 @@ function UserProfile() {
     setFormLoading(true);
 
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await sendPasswordChangeOtp({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
 
-      const response = await fetch(
-        "http://localhost:5001/api/user/change-password/send-otp",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            currentPassword,
-            newPassword,
-            confirmPassword,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         setPasswordOtpSent(true);
 
         showNotificationMessage(
           "OTP Sent",
           "OTP has been sent to your registered email address.",
-          "success"
+          "success",
         );
       } else {
         showNotificationMessage(
           "Password Change Failed",
           data.message || "Unable to send OTP.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
-      console.error(
-        "Send password OTP error:",
-        error
-      );
+      console.error("Send password OTP error:", error);
 
       showNotificationMessage(
         "Something Went Wrong",
-        "Unable to send OTP. Please try again.",
-        "error"
+        error.response?.data?.message ||
+          "Unable to send OTP. Please try again.",
+        "error",
       );
     } finally {
       setFormLoading(false);
@@ -772,7 +627,7 @@ function UserProfile() {
       showNotificationMessage(
         "Invalid OTP",
         "Please enter a valid 6-digit OTP.",
-        "error"
+        "error",
       );
       return;
     }
@@ -780,27 +635,13 @@ function UserProfile() {
     setFormLoading(true);
 
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await verifyPasswordChangeOtp({
+        otp: passwordOtp,
+        newPassword,
+        confirmPassword,
+      });
 
-      const response = await fetch(
-        "http://localhost:5001/api/user/change-password/verify-otp",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            otp: passwordOtp,
-            newPassword,
-            confirmPassword,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         setShowChangePassword(false);
 
         setCurrentPassword("");
@@ -812,25 +653,23 @@ function UserProfile() {
         showNotificationMessage(
           "Password Changed",
           "Your password has been changed successfully.",
-          "success"
+          "success",
         );
       } else {
         showNotificationMessage(
           "Verification Failed",
           data.message || "Invalid OTP.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
-      console.error(
-        "Verify password OTP error:",
-        error
-      );
+      console.error("Verify password OTP error:", error);
 
       showNotificationMessage(
         "Something Went Wrong",
-        "Unable to verify OTP. Please try again.",
-        "error"
+        error.response?.data?.message ||
+          "Unable to verify OTP. Please try again.",
+        "error",
       );
     } finally {
       setFormLoading(false);
@@ -846,32 +685,13 @@ function UserProfile() {
     setPasswordOtpSent(false);
   };
 
-  // =========================================================
-  // GET ADDRESSES
-  // =========================================================
+  //.................... GET ADDRESS ...............//
 
   const fetchAddresses = async () => {
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await getAddresses();
 
-      if (!token) {
-        return;
-      }
-
-      const response = await fetch(
-        "http://localhost:5001/api/user/addresses",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         setAddresses(data.addresses);
       } else {
         console.error(data.message);
@@ -879,7 +699,7 @@ function UserProfile() {
         showNotificationMessage(
           "Address Error",
           data.message || "Unable to load addresses.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
@@ -887,8 +707,9 @@ function UserProfile() {
 
       showNotificationMessage(
         "Address Error",
-        "Something went wrong while loading addresses.",
-        "error"
+        error.response?.data?.message ||
+          "Something went wrong while loading addresses.",
+        "error",
       );
     }
   };
@@ -940,35 +761,15 @@ function UserProfile() {
     e.preventDefault();
 
     try {
-      const token = localStorage.getItem("userToken");
+      let data;
 
-      if (!token) {
-        showNotificationMessage(
-          "Authentication Required",
-          "Please login again to continue.",
-          "error"
-        );
-        return;
+      if (editingAddressId) {
+        data = await updateAddress(editingAddressId, addressForm);
+      } else {
+        data = await addAddress(addressForm);
       }
 
-      const url = editingAddressId
-        ? `http://localhost:5001/api/user/addresses/${editingAddressId}`
-        : "http://localhost:5001/api/user/addresses";
-
-      const method = editingAddressId ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(addressForm),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         const wasEditing = Boolean(editingAddressId);
 
         setShowAddressForm(false);
@@ -978,32 +779,28 @@ function UserProfile() {
         fetchAddresses();
 
         showNotificationMessage(
-          wasEditing
-            ? "Address Updated"
-            : "Address Added",
+          wasEditing ? "Address Updated" : "Address Added",
           data.message ||
             (wasEditing
               ? "Your address has been updated successfully."
               : "Your address has been added successfully."),
-          "success"
+          "success",
         );
       } else {
         showNotificationMessage(
           "Address Error",
           data.message || "Unable to save address.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
-      console.error(
-        "Address submit error:",
-        error
-      );
+      console.error("Address submit error:", error);
 
       showNotificationMessage(
         "Something Went Wrong",
-        "Unable to save the address. Please try again.",
-        "error"
+        error.response?.data?.message ||
+          "Unable to save the address. Please try again.",
+        "error",
       );
     }
   };
@@ -1029,130 +826,83 @@ function UserProfile() {
 
   // ================= DELETE ADDRESS =================
 
-  const deleteAddress = async (addressId) => {
-    try {
-      const token = localStorage.getItem("userToken");
+  const handleDeleteAddressApi = async (addressId) => {
+  try {
+    const data = await deleteAddress(addressId);
 
-      if (!token) {
-        showNotificationMessage(
-          "Authentication Required",
-          "Please login again to continue.",
-          "error"
-        );
-        return;
-      }
-
-      const response = await fetch(
-        `http://localhost:5001/api/user/addresses/${addressId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        fetchAddresses();
-
-        showNotificationMessage(
-          "Address Deleted",
-          data.message ||
-            "The address has been deleted successfully.",
-          "success"
-        );
-      } else {
-        showNotificationMessage(
-          "Delete Failed",
-          data.message || "Unable to delete the address.",
-          "error"
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Delete address error:",
-        error
-      );
+    if (data.success) {
+      fetchAddresses();
 
       showNotificationMessage(
-        "Something Went Wrong",
-        "Unable to delete the address. Please try again.",
-        "error"
+        "Address Deleted",
+        data.message ||
+          "The address has been deleted successfully.",
+        "success",
+      );
+    } else {
+      showNotificationMessage(
+        "Delete Failed",
+        data.message || "Unable to delete the address.",
+        "error",
       );
     }
-  };
+  } catch (error) {
+    console.error("Delete address error:", error);
+
+    showNotificationMessage(
+      "Something Went Wrong",
+      error.response?.data?.message ||
+        "Unable to delete the address. Please try again.",
+      "error",
+    );
+  }
+};
 
   // ================= DELETE CONFIRMATION =================
 
   const handleDeleteAddress = (addressId) => {
-    showConfirmationMessage(
-      "Delete Address?",
-      "Are you sure you want to delete this address?",
-      () => deleteAddress(addressId),
-      "Delete"
-    );
-  };
+  showConfirmationMessage(
+    "Delete Address?",
+    "Are you sure you want to delete this address?",
+    () => handleDeleteAddressApi(addressId),
+    "Delete",
+  );
+};
 
   // ================= SET DEFAULT =================
 
   const handleSetDefault = async (addressId) => {
     try {
-      const token = localStorage.getItem("userToken");
+      const data = await setDefaultAddress(addressId);
 
-      if (!token) {
-        showNotificationMessage(
-          "Authentication Required",
-          "Please login again to continue.",
-          "error"
-        );
-        return;
-      }
-
-      const response = await fetch(
-        `http://localhost:5001/api/user/addresses/${addressId}/default`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         fetchAddresses();
 
         showNotificationMessage(
           "Default Address Updated",
-          data.message ||
-            "Your default address has been updated.",
-          "success"
+          data.message || "Your default address has been updated.",
+          "success",
         );
       } else {
         showNotificationMessage(
           "Update Failed",
           data.message || "Unable to set default address.",
-          "error"
+          "error",
         );
       }
     } catch (error) {
-      console.error(
-        "Set default error:",
-        error
-      );
+      console.error("Set default error:", error);
 
       showNotificationMessage(
         "Something Went Wrong",
-        "Unable to update the default address.",
-        "error"
+        error.response?.data?.message ||
+          "Unable to update the default address.",
+        "error",
       );
     }
   };
 
-  // ================= LOGOUT =================
+  // .................LOGOUT ............
 
   const logoutUser = () => {
     localStorage.removeItem("userToken");
@@ -1166,7 +916,7 @@ function UserProfile() {
       "Logout?",
       "Are you sure you want to logout?",
       logoutUser,
-      "Logout"
+      "Logout",
     );
   };
 
@@ -1182,19 +932,13 @@ function UserProfile() {
 
   return (
     <div className="profile-page">
-
-
-
       {/* ================= SIDEBAR ================= */}
 
       <aside className="profile-sidebar">
-
         <h2>My Account</h2>
 
         <button
-          className={`sidebar-item ${
-            !showAddresses ? "active" : ""
-          }`}
+          className={`sidebar-item ${!showAddresses ? "active" : ""}`}
           onClick={() => setShowAddresses(false)}
         >
           <User size={18} />
@@ -1212,72 +956,48 @@ function UserProfile() {
         </button>
 
         <button
-          className={`sidebar-item ${
-            showAddresses ? "active" : ""
-          }`}
+          className={`sidebar-item ${showAddresses ? "active" : ""}`}
           onClick={handleAddresses}
         >
           <MapPin size={18} />
           <span>Addresses</span>
         </button>
 
-        <button
-          className="sidebar-item"
-          onClick={openChangePassword}
-        >
+        <button className="sidebar-item" onClick={openChangePassword}>
           <Lock size={18} />
           <span>Change Password</span>
         </button>
 
-        <button
-          className="sidebar-item"
-          onClick={openChangeEmail}
-        >
+        <button className="sidebar-item" onClick={openChangeEmail}>
           <Mail size={18} />
           <span>Change Email</span>
         </button>
 
-        <button
-          className="sidebar-item logout"
-          onClick={handleLogout}
-        >
+        <button className="sidebar-item logout" onClick={handleLogout}>
           <LogOut size={18} />
           <span>Logout</span>
         </button>
-
       </aside>
 
       {/* ================= MAIN CONTENT ================= */}
 
       <main className="profile-content">
-
         {!showAddresses ? (
-
           <>
             <h1>My Profile</h1>
 
-            <p className="profile-subtitle">
-              Manage your personal information
-            </p>
+            <p className="profile-subtitle">Manage your personal information</p>
 
             <div className="profile-card">
-
               {/* ================= PROFILE IMAGE ================= */}
 
               <div className="profile-image-section">
-
                 <div className="profile-image">
-
-                  {user.profileImage &&
-                  user.profileImage.length > 0 ? (
-                    <img
-                      src={user.profileImage[0]}
-                      alt="Profile"
-                    />
+                  {user.profileImage && user.profileImage.length > 0 ? (
+                    <img src={user.profileImage[0]} alt="Profile" />
                   ) : (
                     <User size={55} />
                   )}
-
                 </div>
 
                 {/* Hidden file input */}
@@ -1303,23 +1023,20 @@ function UserProfile() {
 
                 {/* Remove Photo */}
 
-                {user.profileImage &&
-                  user.profileImage.length > 0 && (
-                    <button
-                      type="button"
-                      className="remove-image"
-                      onClick={handleRemoveProfileImage}
-                    >
-                      Remove Photo
-                    </button>
-                  )}
-
+                {user.profileImage && user.profileImage.length > 0 && (
+                  <button
+                    type="button"
+                    className="remove-image"
+                    onClick={handleRemoveProfileImage}
+                  >
+                    Remove Photo
+                  </button>
+                )}
               </div>
 
               {/* ================= PROFILE INFORMATION ================= */}
 
               <div className="profile-info">
-
                 <div className="info-group">
                   <label>Name</label>
                   <p>{user.name}</p>
@@ -1330,59 +1047,37 @@ function UserProfile() {
                   <p>{user.email}</p>
                 </div>
 
-                <button
-                  className="edit-profile-btn"
-                  onClick={openEditProfile}
-                >
+                <button className="edit-profile-btn" onClick={openEditProfile}>
                   Edit Profile
                 </button>
-
               </div>
-
             </div>
           </>
-
         ) : (
-
           <>
             {/* ================= ADDRESS HEADER ================= */}
 
             <div className="address-header">
-
               <div>
                 <h1>My Addresses</h1>
 
-                <p className="profile-subtitle">
-                  Manage your saved addresses
-                </p>
+                <p className="profile-subtitle">Manage your saved addresses</p>
               </div>
 
-              <button
-                className="add-address-btn"
-                onClick={handleAddAddress}
-              >
+              <button className="add-address-btn" onClick={handleAddAddress}>
                 <Plus size={18} />
                 Add Address
               </button>
-
             </div>
 
             {/* ================= ADDRESS FORM ================= */}
 
             {showAddressForm && (
-
               <div className="address-form-card">
-
-                <h2>
-                  {editingAddressId
-                    ? "Edit Address"
-                    : "Add New Address"}
-                </h2>
+                <h2>{editingAddressId ? "Edit Address" : "Add New Address"}</h2>
 
                 <form onSubmit={handleAddressSubmit}>
-
                   <div className="address-form-grid">
-
                     <input
                       type="text"
                       name="fullName"
@@ -1436,11 +1131,9 @@ function UserProfile() {
                       onChange={handleAddressChange}
                       required
                     />
-
                   </div>
 
                   <div className="address-type">
-
                     <label>Address Type</label>
 
                     <select
@@ -1452,29 +1145,22 @@ function UserProfile() {
                       <option value="Work">Work</option>
                       <option value="Other">Other</option>
                     </select>
-
                   </div>
 
                   <label className="default-checkbox">
-
                     <input
                       type="checkbox"
                       name="isDefault"
                       checked={addressForm.isDefault}
                       onChange={handleAddressChange}
                     />
-
                     Set as default address
-
                   </label>
 
                   <div className="address-form-buttons">
-
                     <button type="submit">
                       <Check size={17} />
-                      {editingAddressId
-                        ? "Update Address"
-                        : "Save Address"}
+                      {editingAddressId ? "Update Address" : "Save Address"}
                     </button>
 
                     <button
@@ -1487,22 +1173,16 @@ function UserProfile() {
                     >
                       Cancel
                     </button>
-
                   </div>
-
                 </form>
-
               </div>
             )}
 
             {/* ================= ADDRESS LIST ================= */}
 
             <div className="address-list">
-
               {addresses.length === 0 ? (
-
                 <div className="empty-address">
-
                   <MapPin size={40} />
 
                   <p>No addresses saved yet.</p>
@@ -1511,30 +1191,18 @@ function UserProfile() {
                     <Plus size={17} />
                     Add Your First Address
                   </button>
-
                 </div>
-
               ) : (
-
                 addresses.map((address) => (
-
-                  <div
-                    className="address-card"
-                    key={address._id}
-                  >
-
+                  <div className="address-card" key={address._id}>
                     <div className="address-card-top">
-
                       <div>
                         <h3>{address.addressType}</h3>
 
                         {address.isDefault && (
-                          <span className="default-badge">
-                            Default
-                          </span>
+                          <span className="default-badge">Default</span>
                         )}
                       </div>
-
                     </div>
 
                     <p>
@@ -1546,55 +1214,33 @@ function UserProfile() {
                     <p>{address.addressLine}</p>
 
                     <p>
-                      {address.city}, {address.state} -{" "}
-                      {address.pincode}
+                      {address.city}, {address.state} - {address.pincode}
                     </p>
 
                     <div className="address-actions">
-
-                      <button
-                        onClick={() =>
-                          handleEditAddress(address)
-                        }
-                      >
+                      <button onClick={() => handleEditAddress(address)}>
                         <Pencil size={14} />
                         Edit
                       </button>
 
-                      <button
-                        onClick={() =>
-                          handleDeleteAddress(address._id)
-                        }
-                      >
+                      <button onClick={() => handleDeleteAddress(address._id)}>
                         <Trash2 size={14} />
                         Delete
                       </button>
 
                       {!address.isDefault && (
-                        <button
-                          onClick={() =>
-                            handleSetDefault(address._id)
-                          }
-                        >
+                        <button onClick={() => handleSetDefault(address._id)}>
                           <Check size={14} />
                           Set Default
                         </button>
                       )}
-
                     </div>
-
                   </div>
-
                 ))
-
               )}
-
             </div>
-
           </>
-
         )}
-
       </main>
 
       {/* =====================================================
@@ -1603,11 +1249,8 @@ function UserProfile() {
 
       {showEditProfile && (
         <div className="profile-modal-overlay">
-
           <div className="profile-modal">
-
             <div className="profile-modal-header">
-
               <h2>Edit Profile</h2>
 
               <button
@@ -1617,54 +1260,36 @@ function UserProfile() {
               >
                 <X size={20} />
               </button>
-
             </div>
 
             <form onSubmit={handleUpdateProfile}>
-
               <div className="profile-form-group">
-
                 <label>Name</label>
 
                 <input
                   type="text"
                   value={editName}
-                  onChange={(e) =>
-                    setEditName(e.target.value)
-                  }
+                  onChange={(e) => setEditName(e.target.value)}
                   placeholder="Enter your name"
                 />
-
               </div>
 
               <div className="profile-modal-buttons">
-
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                >
-                  {formLoading
-                    ? "Saving..."
-                    : "Save Changes"}
+                <button type="submit" disabled={formLoading}>
+                  {formLoading ? "Saving..." : "Save Changes"}
                 </button>
 
                 <button
                   type="button"
                   className="cancel-btn"
-                  onClick={() =>
-                    setShowEditProfile(false)
-                  }
+                  onClick={() => setShowEditProfile(false)}
                   disabled={formLoading}
                 >
                   Cancel
                 </button>
-
               </div>
-
             </form>
-
           </div>
-
         </div>
       )}
 
@@ -1674,11 +1299,8 @@ function UserProfile() {
 
       {showImageModal && (
         <div className="profile-modal-overlay">
-
           <div className="profile-modal image-preview-modal">
-
             <div className="profile-modal-header">
-
               <h2>Change Profile Photo</h2>
 
               <button
@@ -1689,11 +1311,9 @@ function UserProfile() {
               >
                 <X size={20} />
               </button>
-
             </div>
 
             <div className="image-preview-container">
-
               {imagePreview && (
                 <img
                   src={imagePreview}
@@ -1701,7 +1321,6 @@ function UserProfile() {
                   className="image-preview"
                 />
               )}
-
             </div>
 
             <p className="image-preview-info">
@@ -1709,15 +1328,12 @@ function UserProfile() {
             </p>
 
             <div className="profile-modal-buttons">
-
               <button
                 type="button"
                 onClick={handleSaveProfileImage}
                 disabled={formLoading}
               >
-                {formLoading
-                  ? "Saving..."
-                  : "Save Photo"}
+                {formLoading ? "Saving..." : "Save Photo"}
               </button>
 
               <button
@@ -1728,11 +1344,8 @@ function UserProfile() {
               >
                 Cancel
               </button>
-
             </div>
-
           </div>
-
         </div>
       )}
 
@@ -1742,11 +1355,8 @@ function UserProfile() {
 
       {showChangeEmail && (
         <div className="profile-modal-overlay">
-
           <div className="profile-modal">
-
             <div className="profile-modal-header">
-
               <h2>Change Email</h2>
 
               <button
@@ -1756,49 +1366,30 @@ function UserProfile() {
               >
                 <X size={20} />
               </button>
-
             </div>
 
             {!emailOtpSent ? (
-
               <form onSubmit={handleSendEmailOtp}>
-
                 <div className="profile-form-group">
-
                   <label>Current Email</label>
 
-                  <input
-                    type="email"
-                    value={user.email}
-                    disabled
-                  />
-
+                  <input type="email" value={user.email} disabled />
                 </div>
 
                 <div className="profile-form-group">
-
                   <label>New Email</label>
 
                   <input
                     type="email"
                     value={newEmail}
-                    onChange={(e) =>
-                      setNewEmail(e.target.value)
-                    }
+                    onChange={(e) => setNewEmail(e.target.value)}
                     placeholder="Enter new email"
                   />
-
                 </div>
 
                 <div className="profile-modal-buttons">
-
-                  <button
-                    type="submit"
-                    disabled={formLoading}
-                  >
-                    {formLoading
-                      ? "Sending..."
-                      : "Send OTP"}
+                  <button type="submit" disabled={formLoading}>
+                    {formLoading ? "Sending..." : "Send OTP"}
                   </button>
 
                   <button
@@ -1809,15 +1400,10 @@ function UserProfile() {
                   >
                     Cancel
                   </button>
-
                 </div>
-
               </form>
-
             ) : (
-
               <form onSubmit={handleVerifyEmailOtp}>
-
                 <p className="otp-info">
                   OTP has been sent to:
                   <br />
@@ -1825,7 +1411,6 @@ function UserProfile() {
                 </p>
 
                 <div className="profile-form-group">
-
                   <label>Enter OTP</label>
 
                   <input
@@ -1834,24 +1419,15 @@ function UserProfile() {
                     maxLength={6}
                     inputMode="numeric"
                     onChange={(e) =>
-                      setEmailOtp(
-                        e.target.value.replace(/\D/g, "")
-                      )
+                      setEmailOtp(e.target.value.replace(/\D/g, ""))
                     }
                     placeholder="Enter 6-digit OTP"
                   />
-
                 </div>
 
                 <div className="profile-modal-buttons">
-
-                  <button
-                    type="submit"
-                    disabled={formLoading}
-                  >
-                    {formLoading
-                      ? "Verifying..."
-                      : "Verify OTP"}
+                  <button type="submit" disabled={formLoading}>
+                    {formLoading ? "Verifying..." : "Verify OTP"}
                   </button>
 
                   <button
@@ -1862,15 +1438,10 @@ function UserProfile() {
                   >
                     Cancel
                   </button>
-
                 </div>
-
               </form>
-
             )}
-
           </div>
-
         </div>
       )}
 
@@ -1878,11 +1449,8 @@ function UserProfile() {
 
       {showChangePassword && (
         <div className="profile-modal-overlay">
-
           <div className="profile-modal">
-
             <div className="profile-modal-header">
-
               <h2>Change Password</h2>
 
               <button
@@ -1892,72 +1460,51 @@ function UserProfile() {
               >
                 <X size={20} />
               </button>
-
             </div>
 
             {!passwordOtpSent ? (
-
               <form onSubmit={handleSendPasswordOtp}>
-
                 <div className="profile-form-group">
-
                   <label>Current Password</label>
 
                   <input
                     type="password"
                     value={currentPassword}
-                    onChange={(e) =>
-                      setCurrentPassword(e.target.value)
-                    }
+                    onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder="Enter current password"
                   />
-
                 </div>
 
                 <div className="profile-form-group">
-
                   <label>New Password</label>
 
                   <input
                     type="password"
                     value={newPassword}
-                    onChange={(e) =>
-                      setNewPassword(e.target.value)
-                    }
+                    onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Enter new password"
                   />
-
                 </div>
 
                 <div className="profile-form-group">
-
                   <label>Confirm New Password</label>
 
                   <input
                     type="password"
                     value={confirmPassword}
-                    onChange={(e) =>
-                      setConfirmPassword(e.target.value)
-                    }
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
                   />
-
                 </div>
 
                 <p className="password-hint">
-                  Password must be 8-20 characters and include
-                  uppercase, lowercase, number and special character.
+                  Password must be 8-20 characters and include uppercase,
+                  lowercase, number and special character.
                 </p>
 
                 <div className="profile-modal-buttons">
-
-                  <button
-                    type="submit"
-                    disabled={formLoading}
-                  >
-                    {formLoading
-                      ? "Sending..."
-                      : "Send OTP"}
+                  <button type="submit" disabled={formLoading}>
+                    {formLoading ? "Sending..." : "Send OTP"}
                   </button>
 
                   <button
@@ -1968,21 +1515,15 @@ function UserProfile() {
                   >
                     Cancel
                   </button>
-
                 </div>
-
               </form>
-
             ) : (
-
               <form onSubmit={handleVerifyPasswordOtp}>
-
                 <p className="otp-info">
                   OTP has been sent to your registered email address.
                 </p>
 
                 <div className="profile-form-group">
-
                   <label>Enter OTP</label>
 
                   <input
@@ -1991,24 +1532,15 @@ function UserProfile() {
                     maxLength={6}
                     inputMode="numeric"
                     onChange={(e) =>
-                      setPasswordOtp(
-                        e.target.value.replace(/\D/g, "")
-                      )
+                      setPasswordOtp(e.target.value.replace(/\D/g, ""))
                     }
                     placeholder="Enter 6-digit OTP"
                   />
-
                 </div>
 
                 <div className="profile-modal-buttons">
-
-                  <button
-                    type="submit"
-                    disabled={formLoading}
-                  >
-                    {formLoading
-                      ? "Verifying..."
-                      : "Verify & Change Password"}
+                  <button type="submit" disabled={formLoading}>
+                    {formLoading ? "Verifying..." : "Verify & Change Password"}
                   </button>
 
                   <button
@@ -2019,15 +1551,10 @@ function UserProfile() {
                   >
                     Cancel
                   </button>
-
                 </div>
-
               </form>
-
             )}
-
           </div>
-
         </div>
       )}
 
@@ -2052,7 +1579,6 @@ function UserProfile() {
         confirmText={confirmationText}
         cancelText="Cancel"
       />
-
     </div>
   );
 }

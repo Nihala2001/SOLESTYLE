@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 import NotificationModal from "../common/NotificationModal";
 import "./Login.css";
+import { loginUser, googleLogin,} from "../../api/services/authServices";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -67,29 +68,10 @@ function Login() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:5001/api/auth/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: trimmedEmail,
-            password,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setErrors({
-          general: data.message || "Login failed",
-        });
-
-        return;
-      }
+     const data = await loginUser({
+     email: trimmedEmail,
+     password,
+      });
 
       // Save token
       if (data.token) {
@@ -115,7 +97,7 @@ function Login() {
       console.error("Login error:", error);
 
       setErrors({
-        general: "Something went wrong. Please try again.",
+        general:  error.response?.data?.message || "Something went wrong. Please try again.",
       });
 
     } finally {
@@ -123,35 +105,13 @@ function Login() {
     }
   };
 
-  // ======================== GOOGLE LOGIN ======================== //
+  // ....................GOOGLE LOGIN ................//
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      const response = await fetch(
-        "http://localhost:5001/api/auth/google-login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            idToken: credentialResponse.credential,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        showNotificationMessage(
-          "Google Login Failed",
-          data.message || "Google authentication failed",
-          "error"
+      const data = await googleLogin(
+       credentialResponse.credential
         );
-
-        return;
-      }
-
       // Save token
       if (data.token) {
         localStorage.setItem(

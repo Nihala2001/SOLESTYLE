@@ -1,7 +1,14 @@
-
 import { useEffect, useState } from "react";
 import Cropper from "react-easy-crop";
 import AdminLayout from "../components/admin/AdminLayout";
+import {
+  getAdminCategories,
+  getAdminProducts,
+  addAdminProduct,
+  updateAdminProduct,
+  deleteAdminProduct,
+  activateAdminProduct,
+} from "../api/services/adminService";
 import "./AdminProducts.css";
 
 function AdminProducts() {
@@ -57,8 +64,7 @@ function AdminProducts() {
   const [editingProduct, setEditingProduct] = useState(null);
 
   const [editProductName, setEditProductName] = useState("");
-  const [editProductDescription, setEditProductDescription] =
-    useState("");
+  const [editProductDescription, setEditProductDescription] = useState("");
   const [editProductCategory, setEditProductCategory] = useState("");
   const [editBasePrice, setEditBasePrice] = useState("");
 
@@ -73,167 +79,131 @@ function AdminProducts() {
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  
   // ========================crop image====================================
 
-  const createCroppedImage = async (
-  imageSrc,
-  pixelCrop
-) => {
-  const image = new Image();
+  const createCroppedImage = async (imageSrc, pixelCrop) => {
+    const image = new Image();
 
-  image.src = imageSrc;
+    image.src = imageSrc;
 
-  await new Promise((resolve, reject) => {
-    image.onload = resolve;
-    image.onerror = reject;
-  });
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+    });
 
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
 
-  const maxWidth = 1200;
-  const maxHeight = 1200;
+    const maxWidth = 1200;
+    const maxHeight = 1200;
 
-  let width = pixelCrop.width;
-  let height = pixelCrop.height;
+    let width = pixelCrop.width;
+    let height = pixelCrop.height;
 
-  if (width > maxWidth || height > maxHeight) {
-    const scale = Math.min(
-      maxWidth / width,
-      maxHeight / height
+    if (width > maxWidth || height > maxHeight) {
+      const scale = Math.min(maxWidth / width, maxHeight / height);
+
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+
+    ctx.drawImage(
+      image,
+      pixelCrop.x,
+      pixelCrop.y,
+      pixelCrop.width,
+      pixelCrop.height,
+      0,
+      0,
+      width,
+      height,
     );
 
-    width = Math.round(width * scale);
-    height = Math.round(height * scale);
-  }
-
-  canvas.width = width;
-  canvas.height = height;
-
-  ctx.drawImage(
-    image,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
-    0,
-    0,
-    width,
-    height
-  );
-
-  return new Promise((resolve) => {
-    canvas.toBlob(
-      (blob) => {
-        resolve(
-          new File(
-            [blob],
-            "product-image.jpg",
-            {
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          resolve(
+            new File([blob], "product-image.jpg", {
               type: "image/jpeg",
-            }
-          )
-        );
-      },
-      "image/jpeg",
-      0.85
-    );
-  });
-};
+            }),
+          );
+        },
+        "image/jpeg",
+        0.85,
+      );
+    });
+  };
 
-//..........handle image change.............//
+  //..........handle image change.............//
   const handleImageChange = (event) => {
-  const files = Array.from(event.target.files);
+    const files = Array.from(event.target.files);
 
-  if (files.length < 3) {
-    setAddError("Please select at least 3 product images");
-    return;
-  }
+    if (files.length < 3) {
+      setAddError("Please select at least 3 product images");
+      return;
+    }
 
-  if (files.length > 5) {
-    setAddError("You can select a maximum of 5 product images");
-    return;
-  }
+    if (files.length > 5) {
+      setAddError("You can select a maximum of 5 product images");
+      return;
+    }
 
-  setAddError("");
+    setAddError("");
 
-  const firstImage = URL.createObjectURL(files[0]);
+    const firstImage = URL.createObjectURL(files[0]);
 
-  setCropQueue(files);
-  setCurrentCropIndex(0);
-  setCropImage(firstImage);
-  setCrop({ x: 0, y: 0 });
-  setZoom(1);
-};
+    setCropQueue(files);
+    setCurrentCropIndex(0);
+    setCropImage(firstImage);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+  };
 
+  const handleCropComplete = (_, croppedPixels) => {
+    setCroppedAreaPixels(croppedPixels);
+  };
 
-const handleCropComplete = (_, croppedPixels) => {
-  setCroppedAreaPixels(croppedPixels);
-};
-
-const handleCropConfirm = async () => {
-  try {
-    const croppedFile = await createCroppedImage(
-      cropImage,
-      croppedAreaPixels
-    );
-
-    setProductImages((prevImages) => [
-      ...prevImages,
-      croppedFile,
-    ]);
-
-    URL.revokeObjectURL(cropImage);
-
-    const nextIndex = currentCropIndex + 1;
-
-    if (nextIndex < cropQueue.length) {
-      const nextImage = URL.createObjectURL(
-        cropQueue[nextIndex]
+  const handleCropConfirm = async () => {
+    try {
+      const croppedFile = await createCroppedImage(
+        cropImage,
+        croppedAreaPixels,
       );
 
-      setCurrentCropIndex(nextIndex);
-      setCropImage(nextImage);
-      setCrop({ x: 0, y: 0 });
-      setZoom(1);
-      setCroppedAreaPixels(null);
-    } else {
-      setCropImage(null);
-      setCropQueue([]);
-      setCurrentCropIndex(0);
-      setCroppedAreaPixels(null);
+      setProductImages((prevImages) => [...prevImages, croppedFile]);
+
+      URL.revokeObjectURL(cropImage);
+
+      const nextIndex = currentCropIndex + 1;
+
+      if (nextIndex < cropQueue.length) {
+        const nextImage = URL.createObjectURL(cropQueue[nextIndex]);
+
+        setCurrentCropIndex(nextIndex);
+        setCropImage(nextImage);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+        setCroppedAreaPixels(null);
+      } else {
+        setCropImage(null);
+        setCropQueue([]);
+        setCurrentCropIndex(0);
+        setCroppedAreaPixels(null);
+      }
+    } catch (error) {
+      console.error("Image crop error:", error);
+      setAddError("Failed to process image");
     }
-  } catch (error) {
-    console.error("Image crop error:", error);
-    setAddError("Failed to process image");
-  }
-};
-  // ============================================================
-  // FETCH CATEGORIES
-  // ============================================================
+  };
+
+  // .................................FETCH CATEGORIES
 
   const fetchCategories = async () => {
     try {
-      const adminToken = localStorage.getItem("adminToken");
-
-      const response = await fetch(
-        "http://localhost:5001/api/admin/categories?limit=100",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${adminToken}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to fetch categories"
-        );
-      }
+      const data = await getAdminCategories();
 
       setCategories(data.categories || []);
     } catch (error) {
@@ -241,46 +211,25 @@ const handleCropConfirm = async () => {
     }
   };
 
-  // ============================================================
-  // FETCH PRODUCTS
-  // ============================================================
-
+  // ...............................FETCH PRODUCTS
   const fetchProducts = async () => {
     try {
       setLoading(true);
 
-      const adminToken = localStorage.getItem("adminToken");
-
-      const params = new URLSearchParams();
+      const params = {
+        page,
+        limit: 5,
+      };
 
       if (searchQuery.trim()) {
-        params.append("search", searchQuery.trim());
+        params.search = searchQuery.trim();
       }
 
       if (selectedCategory) {
-        params.append("categoryId", selectedCategory);
+        params.categoryId = selectedCategory;
       }
 
-      params.append("page", page);
-      params.append("limit", 5);
-
-      const response = await fetch(
-        `http://localhost:5001/api/admin/products?${params.toString()}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${adminToken}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to fetch products"
-        );
-      }
+      const data = await getAdminProducts(params);
 
       setProducts(data.products || []);
 
@@ -289,7 +238,7 @@ const handleCropConfirm = async () => {
           currentPage: 1,
           totalPages: 1,
           totalProducts: 0,
-        }
+        },
       );
     } catch (error) {
       console.error("Fetch products error:", error);
@@ -298,9 +247,7 @@ const handleCropConfirm = async () => {
     }
   };
 
-  // ============================================================
-  // ADD PRODUCT
-  // ============================================================
+  //.............................. ADD PRODUCT..........
 
   const handleAddProduct = async () => {
     const trimmedName = productName.trim();
@@ -321,22 +268,16 @@ const handleCropConfirm = async () => {
       return;
     }
 
-    if (
-      basePrice === "" ||
-      basePrice === null ||
-      Number(basePrice) < 0
-    ) {
+    if (basePrice === "" || basePrice === null || Number(basePrice) < 0) {
       setAddError("Valid base price is required");
       return;
     }
 
-    // Minimum 3 images
     if (productImages.length < 3) {
       setAddError("Please select at least 3 product images");
       return;
     }
 
-    // Maximum 5 images
     if (productImages.length > 5) {
       setAddError("You can select a maximum of 5 product images");
       return;
@@ -346,9 +287,6 @@ const handleCropConfirm = async () => {
       setAdding(true);
       setAddError("");
 
-      const adminToken = localStorage.getItem("adminToken");
-
-      // Create FormData
       const formData = new FormData();
 
       formData.append("name", trimmedName);
@@ -356,28 +294,14 @@ const handleCropConfirm = async () => {
       formData.append("categoryId", productCategory);
       formData.append("basePrice", Number(basePrice));
 
-      // Add images
       productImages.forEach((image) => {
         formData.append("images", image);
       });
 
-      const response = await fetch(
-        "http://localhost:5001/api/admin/products",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${adminToken}`,
-          },
-          body: formData,
-        }
-      );
+      const data = await addAdminProduct(formData);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to add product"
-        );
+      if (!data.success) {
+        throw new Error(data.message || "Failed to add product");
       }
 
       // Close modal
@@ -394,15 +318,19 @@ const handleCropConfirm = async () => {
       // Refresh products
       fetchProducts();
     } catch (error) {
-      setAddError(error.message);
+      console.error("Add product error:", error);
+
+      setAddError(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to add product",
+      );
     } finally {
       setAdding(false);
     }
   };
 
-  // ============================================================
-  // EDIT PRODUCT
-  // ============================================================
+  // .......................EDIT PRODUCT
 
   const handleEditProduct = async () => {
     const trimmedName = editProductName.trim();
@@ -440,31 +368,15 @@ const handleCropConfirm = async () => {
       setUpdating(true);
       setEditError("");
 
-      const adminToken = localStorage.getItem("adminToken");
+      const data = await updateAdminProduct(editingProduct._id, {
+        name: trimmedName,
+        description: trimmedDescription,
+        categoryId: editProductCategory,
+        basePrice: Number(editBasePrice),
+      });
 
-      const response = await fetch(
-        `http://localhost:5001/api/admin/products/${editingProduct._id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${adminToken}`,
-          },
-          body: JSON.stringify({
-            name: trimmedName,
-            description: trimmedDescription,
-            categoryId: editProductCategory,
-            basePrice: Number(editBasePrice),
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to update product"
-        );
+      if (!data.success) {
+        throw new Error(data.message || "Failed to update product");
       }
 
       // Close modal
@@ -481,16 +393,19 @@ const handleCropConfirm = async () => {
       // Refresh products
       fetchProducts();
     } catch (error) {
-      setEditError(error.message);
+      console.error("Update product error:", error);
+
+      setEditError(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to update product",
+      );
     } finally {
       setUpdating(false);
     }
   };
 
-  // ============================================================
-  // DELETE PRODUCT
-  // ============================================================
-
+  //....................DELETE PRODUCT.................
   const handleDeleteProduct = async () => {
     if (!deletingProduct) {
       return;
@@ -500,24 +415,10 @@ const handleCropConfirm = async () => {
       setDeleting(true);
       setDeleteError("");
 
-      const adminToken = localStorage.getItem("adminToken");
+      const data = await deleteAdminProduct(deletingProduct._id);
 
-      const response = await fetch(
-        `http://localhost:5001/api/admin/products/${deletingProduct._id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${adminToken}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to delete product"
-        );
+      if (!data.success) {
+        throw new Error(data.message || "Failed to delete product");
       }
 
       // Close modal
@@ -531,51 +432,34 @@ const handleCropConfirm = async () => {
       fetchProducts();
     } catch (error) {
       console.error("Delete product error:", error);
-      setDeleteError(error.message);
+
+      setDeleteError(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to delete product",
+      );
     } finally {
       setDeleting(false);
     }
   };
 
-  // ============================================================
-  // ACTIVATE PRODUCT
-  // ============================================================
+  // ............................ACTIVATE PRODUCT..................
 
   const handleActivateProduct = async (productId) => {
     try {
-      const adminToken = localStorage.getItem("adminToken");
+      const data = await activateAdminProduct(productId);
 
-      const response = await fetch(
-        `http://localhost:5001/api/admin/products/${productId}/activate`,
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${adminToken}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to activate product"
-        );
+      if (!data.success) {
+        throw new Error(data.message || "Failed to activate product");
       }
 
       fetchProducts();
     } catch (error) {
-      console.error(
-        "Activate product error:",
-        error
-      );
+      console.error("Activate product error:", error);
     }
   };
 
-  // ============================================================
-  // LOAD DATA
-  // ============================================================
-
+  //......................................LOAD DATA................
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -584,18 +468,14 @@ const handleCropConfirm = async () => {
     fetchProducts();
   }, [page, searchQuery, selectedCategory]);
 
-  // ============================================================
   // SEARCH
-  // ============================================================
 
   const handleSearch = () => {
     setPage(1);
     setSearchQuery(search);
   };
 
-  // ============================================================
-  // CLEAR
-  // ============================================================
+  //clear
 
   const handleClear = () => {
     setSearch("");
@@ -604,9 +484,7 @@ const handleCropConfirm = async () => {
     setPage(1);
   };
 
-  // ============================================================
   // OPEN EDIT MODAL
-  // ============================================================
 
   const openEditModal = (product) => {
     setEditingProduct(product);
@@ -614,11 +492,7 @@ const handleCropConfirm = async () => {
     setEditProductName(product.name);
     setEditProductDescription(product.description);
 
-    setEditProductCategory(
-      product.categoryId?._id ||
-        product.categoryId ||
-        ""
-    );
+    setEditProductCategory(product.categoryId?._id || product.categoryId || "");
 
     setEditBasePrice(product.basePrice);
 
@@ -628,16 +502,13 @@ const handleCropConfirm = async () => {
 
   return (
     <AdminLayout title="Products">
-
       {/* ================= HEADER ================= */}
 
       <div className="products-header">
         <div>
           <h1>Product Management</h1>
 
-          <p>
-            Manage your store products.
-          </p>
+          <p>Manage your store products.</p>
         </div>
 
         <button
@@ -659,7 +530,6 @@ const handleCropConfirm = async () => {
       {/* ================= SEARCH ================= */}
 
       <div className="product-search">
-
         <input
           type="text"
           placeholder="Search product..."
@@ -681,33 +551,22 @@ const handleCropConfirm = async () => {
             setPage(1);
           }}
         >
-          <option value="">
-            All Categories
-          </option>
+          <option value="">All Categories</option>
 
           {categories
             .filter((category) => category.isActive)
             .map((category) => (
-              <option
-                key={category._id}
-                value={category._id}
-              >
+              <option key={category._id} value={category._id}>
                 {category.name}
               </option>
             ))}
         </select>
 
-        <button onClick={handleSearch}>
-          Search
-        </button>
+        <button onClick={handleSearch}>Search</button>
 
-        <button
-          className="clear-button"
-          onClick={handleClear}
-        >
+        <button className="clear-button" onClick={handleClear}>
           Clear
         </button>
-
       </div>
 
       {/* ================= ADD PRODUCT MODAL ================= */}
@@ -722,12 +581,7 @@ const handleCropConfirm = async () => {
             }
           }}
         >
-
-          <div
-            className="product-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-
+          <div className="product-modal" onClick={(e) => e.stopPropagation()}>
             <h2>Add Product</h2>
 
             <p className="modal-description">
@@ -767,17 +621,12 @@ const handleCropConfirm = async () => {
                 setAddError("");
               }}
             >
-              <option value="">
-                Select category
-              </option>
+              <option value="">Select category</option>
 
               {categories
                 .filter((category) => category.isActive)
                 .map((category) => (
-                  <option
-                    key={category._id}
-                    value={category._id}
-                  >
+                  <option key={category._id} value={category._id}>
                     {category.name}
                   </option>
                 ))}
@@ -807,17 +656,12 @@ const handleCropConfirm = async () => {
               onChange={handleImageChange}
             />
 
-            <p className="image-help">
-              Select 3 to 5 product images.
-            </p>
+            <p className="image-help">Select 3 to 5 product images.</p>
 
             {productImages.length > 0 && (
               <div className="image-preview-container">
                 {productImages.map((image, index) => (
-                  <div
-                    className="image-preview"
-                    key={index}
-                  >
+                  <div className="image-preview" key={index}>
                     <img
                       src={URL.createObjectURL(image)}
                       alt={`Product ${index + 1}`}
@@ -827,14 +671,9 @@ const handleCropConfirm = async () => {
               </div>
             )}
 
-            {addError && (
-              <p className="product-error">
-                {addError}
-              </p>
-            )}
+            {addError && <p className="product-error">{addError}</p>}
 
             <div className="modal-buttons">
-
               <button
                 type="button"
                 className="modal-cancel-button"
@@ -858,15 +697,10 @@ const handleCropConfirm = async () => {
                 onClick={handleAddProduct}
                 disabled={adding}
               >
-                {adding
-                  ? "Adding..."
-                  : "Add Product"}
+                {adding ? "Adding..." : "Add Product"}
               </button>
-
             </div>
-
           </div>
-
         </div>
       )}
 
@@ -883,17 +717,10 @@ const handleCropConfirm = async () => {
             }
           }}
         >
-
-          <div
-            className="product-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-
+          <div className="product-modal" onClick={(e) => e.stopPropagation()}>
             <h2>Edit Product</h2>
 
-            <p className="modal-description">
-              Update the product details.
-            </p>
+            <p className="modal-description">Update the product details.</p>
 
             <label>Product Name</label>
 
@@ -911,9 +738,7 @@ const handleCropConfirm = async () => {
             <textarea
               value={editProductDescription}
               onChange={(e) => {
-                setEditProductDescription(
-                  e.target.value
-                );
+                setEditProductDescription(e.target.value);
 
                 setEditError("");
               }}
@@ -924,24 +749,17 @@ const handleCropConfirm = async () => {
             <select
               value={editProductCategory}
               onChange={(e) => {
-                setEditProductCategory(
-                  e.target.value
-                );
+                setEditProductCategory(e.target.value);
 
                 setEditError("");
               }}
             >
-              <option value="">
-                Select category
-              </option>
+              <option value="">Select category</option>
 
               {categories
                 .filter((category) => category.isActive)
                 .map((category) => (
-                  <option
-                    key={category._id}
-                    value={category._id}
-                  >
+                  <option key={category._id} value={category._id}>
                     {category.name}
                   </option>
                 ))}
@@ -959,14 +777,9 @@ const handleCropConfirm = async () => {
               }}
             />
 
-            {editError && (
-              <p className="product-error">
-                {editError}
-              </p>
-            )}
+            {editError && <p className="product-error">{editError}</p>}
 
             <div className="modal-buttons">
-
               <button
                 type="button"
                 className="modal-cancel-button"
@@ -990,15 +803,10 @@ const handleCropConfirm = async () => {
                 onClick={handleEditProduct}
                 disabled={updating}
               >
-                {updating
-                  ? "Updating..."
-                  : "Update"}
+                {updating ? "Updating..." : "Update"}
               </button>
-
             </div>
-
           </div>
-
         </div>
       )}
 
@@ -1015,30 +823,17 @@ const handleCropConfirm = async () => {
             }
           }}
         >
-
-          <div
-            className="product-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-
+          <div className="product-modal" onClick={(e) => e.stopPropagation()}>
             <h2>Delete Product</h2>
 
             <p className="modal-description">
               Are you sure you want to delete{" "}
-              <strong>
-                "{deletingProduct.name}"
-              </strong>
-              ?
+              <strong>"{deletingProduct.name}"</strong>?
             </p>
 
-            {deleteError && (
-              <p className="product-error">
-                {deleteError}
-              </p>
-            )}
+            {deleteError && <p className="product-error">{deleteError}</p>}
 
             <div className="modal-buttons">
-
               <button
                 type="button"
                 className="modal-cancel-button"
@@ -1058,38 +853,22 @@ const handleCropConfirm = async () => {
                 onClick={handleDeleteProduct}
                 disabled={deleting}
               >
-                {deleting
-                  ? "Deleting..."
-                  : "Delete"}
+                {deleting ? "Deleting..." : "Delete"}
               </button>
-
             </div>
-
           </div>
-
         </div>
       )}
 
       {/* ================= PRODUCT TABLE ================= */}
 
       <div className="product-table-container">
-
         {loading ? (
-
-          <div className="product-message">
-            Loading products...
-          </div>
-
+          <div className="product-message">Loading products...</div>
         ) : products.length === 0 ? (
-
-          <div className="product-message">
-            No products found.
-          </div>
-
+          <div className="product-message">No products found.</div>
         ) : (
-
           <table className="product-table">
-
             <thead>
               <tr>
                 <th>#</th>
@@ -1104,220 +883,145 @@ const handleCropConfirm = async () => {
             </thead>
 
             <tbody>
-
-              {products.map(
-                (product, index) => (
-
-                  <tr key={product._id}>
-
-                    <td>
-                      {(page - 1) * 5 +
-                        index +
-                        1}
-                    </td>
-
-                   <td>
-                {product.images &&
-                product.images.length > 0 ? (
-                <img
-                src={product.images[0]}
-                alt={product.name}
-               className="product-table-image"
-              />
-              ) : (
-               <span>No image</span>
-              )}
-              </td>
+              {products.map((product, index) => (
+                <tr key={product._id}>
+                  <td>{(page - 1) * 5 + index + 1}</td>
 
                   <td>
-                    {product.name}
+                    {product.images && product.images.length > 0 ? (
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        className="product-table-image"
+                      />
+                    ) : (
+                      <span>No image</span>
+                    )}
                   </td>
 
-                    <td>
-                      {product.categoryId?.name ||
-                        "No category"}
-                    </td>
+                  <td>{product.name}</td>
 
-                    <td>
-                      ₹{product.basePrice}
-                    </td>
+                  <td>{product.categoryId?.name || "No category"}</td>
 
-                    <td>
+                  <td>₹{product.basePrice}</td>
 
-                      <span
-                        className={
-                          product.isActive
-                            ? "status-active"
-                            : "status-inactive"
-                        }
-                      >
-                        {product.isActive
-                          ? "Active"
-                          : "Inactive"}
-                      </span>
+                  <td>
+                    <span
+                      className={
+                        product.isActive ? "status-active" : "status-inactive"
+                      }
+                    >
+                      {product.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
 
-                    </td>
+                  <td>{new Date(product.createdAt).toLocaleDateString()}</td>
 
-                    <td>
-                      {new Date(
-                        product.createdAt
-                      ).toLocaleDateString()}
-                    </td>
+                  <td>
+                    <button
+                      className="edit-button"
+                      onClick={() => openEditModal(product)}
+                    >
+                      Edit
+                    </button>
 
-                    <td>
-
+                    {product.isActive ? (
                       <button
-                        className="edit-button"
-                        onClick={() =>
-                          openEditModal(product)
-                        }
+                        className="delete-button"
+                        onClick={() => {
+                          setDeletingProduct(product);
+
+                          setDeleteError("");
+
+                          setShowDeleteModal(true);
+                        }}
                       >
-                        Edit
+                        Delete
                       </button>
-
-                      {product.isActive ? (
-
-                        <button
-                          className="delete-button"
-                          onClick={() => {
-                            setDeletingProduct(
-                              product
-                            );
-
-                            setDeleteError("");
-
-                            setShowDeleteModal(
-                              true
-                            );
-                          }}
-                        >
-                          Delete
-                        </button>
-
-                      ) : (
-
-                        <button
-                          className="activate-button"
-                          onClick={() =>
-                            handleActivateProduct(
-                              product._id
-                            )
-                          }
-                        >
-                          Activate
-                        </button>
-
-                      )}
-
-                    </td>
-
-                  </tr>
-
-                )
-              )}
-
+                    ) : (
+                      <button
+                        className="activate-button"
+                        onClick={() => handleActivateProduct(product._id)}
+                      >
+                        Activate
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
-
           </table>
-
         )}
-
       </div>
 
       {/* ================= PAGINATION ================= */}
 
       {pagination.totalPages > 1 && (
-
         <div className="product-pagination">
-
           <button
             disabled={page === 1}
-            onClick={() =>
-              setPage(
-                (prev) => prev - 1
-              )
-            }
+            onClick={() => setPage((prev) => prev - 1)}
           >
             Previous
           </button>
 
           <span>
-            Page {page} of{" "}
-            {pagination.totalPages}
+            Page {page} of {pagination.totalPages}
           </span>
 
           <button
-            disabled={
-              page ===
-              pagination.totalPages
-            }
-            onClick={() =>
-              setPage(
-                (prev) => prev + 1
-              )
-            }
+            disabled={page === pagination.totalPages}
+            onClick={() => setPage((prev) => prev + 1)}
           >
             Next
           </button>
-
         </div>
-
       )}
 
       {cropImage && (
-  <div className="crop-modal-overlay">
-    <div className="crop-modal">
-      <h3>
-        Crop Product Image{" "}
-        {currentCropIndex + 1} of {cropQueue.length}
-      </h3>
+        <div className="crop-modal-overlay">
+          <div className="crop-modal">
+            <h3>
+              Crop Product Image {currentCropIndex + 1} of {cropQueue.length}
+            </h3>
 
-      <div className="crop-container">
-       <Cropper
-  image={cropImage}
-  crop={crop}
-  zoom={zoom}
-  aspect={1}
-  cropShape="rect"
-  showGrid={true}
-  onCropChange={setCrop}
-  onZoomChange={setZoom}
-  onCropComplete={handleCropComplete}
-/>
-      </div>
+            <div className="crop-container">
+              <Cropper
+                image={cropImage}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="rect"
+                showGrid={true}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={handleCropComplete}
+              />
+            </div>
 
-      <div className="zoom-control">
-        <label>Zoom</label>
+            <div className="zoom-control">
+              <label>Zoom</label>
 
-        <input
-          type="range"
-          min={1}
-          max={3}
-          step={0.1}
-          value={zoom}
-          onChange={(event) =>
-            setZoom(Number(event.target.value))
-          }
-        />
-      </div>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.1}
+                value={zoom}
+                onChange={(event) => setZoom(Number(event.target.value))}
+              />
+            </div>
 
-      <div className="crop-modal-buttons">
-        <button
-          type="button"
-          onClick={handleCropConfirm}
-        >
-          {currentCropIndex + 1 === cropQueue.length
-            ? "Finish"
-            : "Next"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+            <div className="crop-modal-buttons">
+              <button type="button" onClick={handleCropConfirm}>
+                {currentCropIndex + 1 === cropQueue.length ? "Finish" : "Next"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
 
 export default AdminProducts;
-

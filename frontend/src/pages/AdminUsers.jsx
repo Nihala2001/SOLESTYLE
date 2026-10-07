@@ -1,150 +1,234 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../components/admin/AdminLayout";
+import NotificationModal from "../components/common/NotificationModal";
+import ConfirmationModal from "../components/common/ConfirmationModal";
+import {
+  getAdminUsers,
+  blockUser,
+  unblockUser,
+} from "../api/services/adminService";
 import "./AdminUsers.css";
 
 function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalUsers: 0,
+  });
+
+  const [notification, setNotification] = useState({
+    show: false,
+    title: "",
+    message: "",
+    type: "success",
+  });
+  const [confirmation, setConfirmation] = useState({
+    show: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+    confirmText: "Confirm",
+  });
 
   const navigate = useNavigate();
 
-  const fetchUsers = async (searchValue = "") => {
+  //modal helpers
+  const showNotification = (title, message, type = "success") => {
+    setNotification({
+      show: true,
+      title,
+      message,
+      type,
+    });
+  };
+
+  const closeNotification = () => {
+    setNotification((prev) => ({
+      ...prev,
+      show: false,
+    }));
+  };
+
+  const showConfirmation = (
+    title,
+    message,
+    onConfirm,
+    confirmText = "Confirm",
+  ) => {
+    setConfirmation({
+      show: true,
+      title,
+      message,
+      onConfirm,
+      confirmText,
+    });
+  };
+
+  const closeConfirmation = () => {
+    setConfirmation((prev) => ({
+      ...prev,
+      show: false,
+      onConfirm: null,
+    }));
+  };
+
+  //................fetch user..........
+
+  const fetchUsers = async (searchValue = "", pageNumber = 1) => {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem("adminToken");
+      const data = await getAdminUsers(searchValue, pageNumber, 5);
+      console.log("ADMIN USERS RESPONSE:", data);
 
-      const response = await fetch(
-        `http://localhost:5001/api/admin/users?search=${encodeURIComponent(
-          searchValue
-        )}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      setUsers(data.users || []);
+      setPagination(
+        data.pagination || {
+          currentPage: 1,
+          totalPages: 1,
+          totalUsers: 0,
+        },
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.message || "Failed to fetch users");
-        return;
-      }
-
-      setUsers(data.users);
     } catch (error) {
       console.error("Fetch users error:", error);
+
+      showNotification(
+        "Failed to Load Users",
+        error.response?.data?.message || "Failed to fetch users",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
+  };
+  const handleSearch = (e) => {
+    const value = e.target.value;
+
+    setSearch(value);
+    fetchUsers(value, 1);
+  };
+
+  const handlePageChange = (pageNumber) => {
+    fetchUsers(search, pageNumber);
   };
 
   useEffect(() => {
     fetchUsers();
   }, []);
-
-  const handleSearch = (e) => {
-    const value = e.target.value;
-    setSearch(value);
-    fetchUsers(value);
-  };
-
   //.......................block user.................//
 
-  const handleBlock = async (userId) => {
-  const confirmBlock = window.confirm(
-    "Are you sure you want to block this user?"
-  );
+  const handleBlock = (userId) => {
+    showConfirmation(
+      "Block User?",
+      "Are you sure you want to block this user?",
+      async () => {
+        try {
+          const data = await blockUser(userId);
 
-  if (!confirmBlock) {
-    return;
-  }
+          if (!data.success) {
+            showNotification(
+              "Block Failed",
+              data.message || "Failed to block user",
+              "error",
+            );
+            return;
+          }
 
-  try {
-    const token = localStorage.getItem("adminToken");
+          showNotification(
+            "User Blocked",
+            data.message || "User blocked successfully",
+            "success",
+          );
 
-    const response = await fetch(
-      `http://localhost:5001/api/admin/users/${userId}/block`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+          fetchUsers(search, pagination.currentPage);
+        } catch (error) {
+          console.error("Block user error:", error);
+
+          showNotification(
+            "Something Went Wrong",
+            error.response?.data?.message || "Something went wrong",
+            "error",
+          );
+        }
+      },
+      "Block",
     );
+  };
+  //..................unblock user...................//
+  const handleUnblock = (userId) => {
+    showConfirmation(
+      "Unblock User?",
+      "Are you sure you want to unblock this user?",
+      async () => {
+        try {
+          const data = await unblockUser(userId);
 
-    const data = await response.json();
+          if (!data.success) {
+            showNotification(
+              "Unblock Failed",
+              data.message || "Failed to unblock user",
+              "error",
+            );
+            return;
+          }
 
-    if (!response.ok) {
-      alert(data.message || "Failed to block user");
-      return;
-    }
+          showNotification(
+            "User Unblocked",
+            data.message || "User unblocked successfully",
+            "success",
+          );
 
-    alert("User blocked successfully");
+          fetchUsers(search, pagination.currentPage);
+        } catch (error) {
+          console.error("Unblock user error:", error);
 
-    fetchUsers(search);
-  } catch (error) {
-    console.error("Block user error:", error);
-    alert("Something went wrong");
-  }
-};
-
-
-//..................unblock user...................//
-  const handleUnblock = async (userId) => {
-  const confirmUnblock = window.confirm(
-    "Are you sure you want to unblock this user?"
-  );
-
-  if (!confirmUnblock) {
-    return;
-  }
-
-  try {
-    const token = localStorage.getItem("adminToken");
-
-    const response = await fetch(
-      `http://localhost:5001/api/admin/users/${userId}/unblock`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+          showNotification(
+            "Something Went Wrong",
+            error.response?.data?.message || "Something went wrong",
+            "error",
+          );
+        }
+      },
+      "Unblock",
     );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      alert(data.message || "Failed to unblock user");
-      return;
-    }
-
-    alert("User unblocked successfully");
-
-    fetchUsers(search);
-  } catch (error) {
-    console.error("Unblock user error:", error);
-    alert("Something went wrong");
-  }
-};
+  };
 
   return (
     <AdminLayout title="User Management">
+      <NotificationModal
+        isOpen={notification.show}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+        onClose={closeNotification}
+      />
+      <ConfirmationModal
+        isOpen={confirmation.show}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmText={confirmation.confirmText}
+        onCancel={closeConfirmation}
+        onConfirm={async () => {
+          const action = confirmation.onConfirm;
+
+          closeConfirmation();
+
+          if (action) {
+            await action();
+          }
+        }}
+      />
       <div className="users-page-header">
         <div>
           <h1>Customers</h1>
           <p>Manage all registered SOLESTYLE customers.</p>
         </div>
 
-        <div className="user-count">
-          {users.length} Users
-        </div>
+        <div className="user-count">{pagination.totalUsers} Users</div>
       </div>
 
       <div className="users-card">
@@ -201,27 +285,19 @@ function AdminUsers() {
 
                     <td>
                       {user.isActive ? (
-                        <span className="status active">
-                          Active
-                        </span>
+                        <span className="status active">Active</span>
                       ) : (
-                        <span className="status blocked">
-                          Blocked
-                        </span>
+                        <span className="status blocked">Blocked</span>
                       )}
                     </td>
 
-                    <td>
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </td>
+                    <td>{new Date(user.createdAt).toLocaleDateString()}</td>
 
                     <td>
                       <div className="action-buttons">
                         <button
                           className="view-button"
-                          onClick={() =>
-                            navigate(`/admin/users/${user._id}`)
-                          }
+                          onClick={() => navigate(`/admin/users/${user._id}`)}
                         >
                           View
                         </button>
@@ -236,9 +312,7 @@ function AdminUsers() {
                         ) : (
                           <button
                             className="unblock-button"
-                            onClick={() =>
-                              handleUnblock(user._id)
-                            }
+                            onClick={() => handleUnblock(user._id)}
                           >
                             Unblock
                           </button>
@@ -249,6 +323,36 @@ function AdminUsers() {
                 ))}
               </tbody>
             </table>
+            <div className="pagination">
+              <button
+                onClick={() => handlePageChange(pagination.currentPage - 1)}
+                disabled={pagination.currentPage === 1}
+              >
+                Previous
+              </button>
+
+              {Array.from(
+                { length: pagination.totalPages },
+                (_, index) => index + 1,
+              ).map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  onClick={() => handlePageChange(pageNumber)}
+                  className={
+                    pagination.currentPage === pageNumber ? "active" : ""
+                  }
+                >
+                  {pageNumber}
+                </button>
+              ))}
+
+              <button
+                onClick={() => handlePageChange(pagination.currentPage + 1)}
+                disabled={pagination.currentPage === pagination.totalPages}
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

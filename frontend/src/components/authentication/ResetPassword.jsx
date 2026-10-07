@@ -1,7 +1,7 @@
-
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import NotificationModal from "../common/NotificationModal";
+import { resetPassword } from "../../api/services/authServices";
 import "./ResetPassword.css";
 
 function ResetPassword() {
@@ -30,11 +30,7 @@ function ResetPassword() {
   const [notificationMessage, setNotificationMessage] = useState("");
   const [notificationType, setNotificationType] = useState("success");
 
-  const showNotificationMessage = (
-    title,
-    message,
-    type = "success"
-  ) => {
+  const showNotificationMessage = (title, message, type = "success") => {
     setNotificationTitle(title);
     setNotificationMessage(message);
     setNotificationType(type);
@@ -75,7 +71,7 @@ function ResetPassword() {
 
     if (!passwordRegex.test(password)) {
       setError(
-        "Password must be 8-20 characters and include uppercase, lowercase, number and special character."
+        "Password must be 8-20 characters and include uppercase, lowercase, number and special character.",
       );
       return;
     }
@@ -93,54 +89,28 @@ function ResetPassword() {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        "http://localhost:5001/api/auth/reset-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            newPassword: password,
-            confirmPassword,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(
-          data.message || "Failed to reset password."
-        );
-        return;
-      }
+      await resetPassword({
+        email,
+        newPassword: password,
+        confirmPassword,
+      });
 
       // Remove stored email
-      sessionStorage.removeItem(
-        "forgotPasswordEmail"
-      );
+      sessionStorage.removeItem("forgotPasswordEmail");
 
       // Show success notification
       showNotificationMessage(
         "Password Reset Successful",
         "Your password has been reset successfully.",
-        "success"
+        "success",
       );
-
     } catch (error) {
-      console.error(
-        "Reset password error:",
-        error
-      );
+      console.error("Reset password error:", error);
 
-      showNotificationMessage(
-        "Password Reset Failed",
-        "Something went wrong. Please try again.",
-        "error"
+      setError(
+        error.response?.data?.message ||
+          "Something went wrong. Please try again.",
       );
-
     } finally {
       setLoading(false);
     }
@@ -150,44 +120,29 @@ function ResetPassword() {
 
   return (
     <div className="reset-page">
-
       <div className="reset-card">
-
         {/* HEADING */}
 
         <div className="reset-heading">
-
           <p>ACCOUNT RECOVERY</p>
 
           <h2>Reset Password</h2>
 
-          <span>
-            Create a new password for your SOLESTYLE account.
-          </span>
-
+          <span>Create a new password for your SOLESTYLE account.</span>
         </div>
 
         {/* FORM */}
 
         <form onSubmit={handleResetPassword}>
-
           {/* NEW PASSWORD */}
 
           <div className="reset-field">
-
-            <label htmlFor="password">
-              NEW PASSWORD
-            </label>
+            <label htmlFor="password">NEW PASSWORD</label>
 
             <div className="reset-password-wrapper">
-
               <input
                 id="password"
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
+                type={showPassword ? "text" : "password"}
                 placeholder="Enter new password"
                 value={password}
                 onChange={(e) => {
@@ -199,44 +154,26 @@ function ResetPassword() {
               <button
                 type="button"
                 className="reset-show-password"
-                onClick={() =>
-                  setShowPassword(
-                    !showPassword
-                  )
-                }
+                onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword
-                  ? "HIDE"
-                  : "SHOW"}
+                {showPassword ? "HIDE" : "SHOW"}
               </button>
-
             </div>
-
           </div>
 
           {/* CONFIRM PASSWORD */}
 
           <div className="reset-field">
-
-            <label htmlFor="confirmPassword">
-              CONFIRM PASSWORD
-            </label>
+            <label htmlFor="confirmPassword">CONFIRM PASSWORD</label>
 
             <div className="reset-password-wrapper">
-
               <input
                 id="confirmPassword"
-                type={
-                  showConfirmPassword
-                    ? "text"
-                    : "password"
-                }
+                type={showConfirmPassword ? "text" : "password"}
                 placeholder="Confirm new password"
                 value={confirmPassword}
                 onChange={(e) => {
-                  setConfirmPassword(
-                    e.target.value
-                  );
+                  setConfirmPassword(e.target.value);
                   setError("");
                 }}
               />
@@ -244,50 +181,30 @@ function ResetPassword() {
               <button
                 type="button"
                 className="reset-show-password"
-                onClick={() =>
-                  setShowConfirmPassword(
-                    !showConfirmPassword
-                  )
-                }
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               >
-                {showConfirmPassword
-                  ? "HIDE"
-                  : "SHOW"}
+                {showConfirmPassword ? "HIDE" : "SHOW"}
               </button>
-
             </div>
-
           </div>
 
           {/* PASSWORD RULE */}
 
           <p className="password-hint">
-            8–20 characters with uppercase,
-            lowercase, number and special character.
+            8–20 characters with uppercase, lowercase, number and special
+            character.
           </p>
 
           {/* ERROR */}
 
-          {error && (
-            <p className="reset-error">
-              {error}
-            </p>
-          )}
+          {error && <p className="reset-error">{error}</p>}
 
           {/* BUTTON */}
 
-          <button
-            type="submit"
-            className="reset-button"
-            disabled={loading}
-          >
-            {loading
-              ? "RESETTING..."
-              : "RESET PASSWORD"}
+          <button type="submit" className="reset-button" disabled={loading}>
+            {loading ? "RESETTING..." : "RESET PASSWORD"}
           </button>
-
         </form>
-
       </div>
 
       {/* ================= NOTIFICATION MODAL ================= */}
@@ -299,7 +216,6 @@ function ResetPassword() {
         message={notificationMessage}
         type={notificationType}
       />
-
     </div>
   );
 }

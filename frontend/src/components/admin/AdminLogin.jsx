@@ -1,6 +1,6 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { loginAdmin } from "../../api/services/adminService";
 import "./AdminLogin.css";
 
 function AdminLogin() {
@@ -69,102 +69,63 @@ function AdminLogin() {
     try {
       setIsLoading(true);
 
-      // ================= ADMIN LOGIN API =================
+      // .............. ADMIN LOGIN API
 
-      const response = await fetch(
-        "http://localhost:5001/api/admin/login",
-        {
-          method: "POST",
+      const data = await loginAdmin({
+        email: trimmedEmail,
+        password,
+      });
 
-          headers: {
-            "Content-Type": "application/json",
-          },
+      //.............. LOGIN ERROR...............
 
-          body: JSON.stringify({
-            email: trimmedEmail,
-            password,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      console.log("ADMIN LOGIN RESPONSE:", data);
-      console.log("ADMIN TOKEN:", data.token);
-
-      // ================= LOGIN ERROR =================
-
-      if (!response.ok) {
+      if (!data.success) {
         setErrors((prev) => ({
           ...prev,
-          general:
-            data.message || "Invalid admin email or password.",
+          general: data.message || "Invalid admin email or password.",
         }));
 
         return;
       }
-
-      // ================= SAVE ADMIN DATA =================
-
+      // ..............SAVE ADMIN DATA
       localStorage.setItem("adminToken", data.token);
 
       if (data.admin) {
-        localStorage.setItem(
-          "admin",
-          JSON.stringify(data.admin)
-        );
+        localStorage.setItem("admin", JSON.stringify(data.admin));
       }
 
-      console.log(
-        "ADMIN TOKEN:",
-        localStorage.getItem("adminToken")
-      );
-
-      // ================= GO TO ADMIN DASHBOARD =================
+      // ................ GO TO ADMIN DASHBOARD................
 
       navigate("/admin/dashboard");
-
     } catch (error) {
       console.error("Admin login error:", error);
 
       setErrors((prev) => ({
         ...prev,
         general:
+          error.response?.data?.message ||
           "Unable to connect to the server. Please try again.",
       }));
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
     <div className="admin-login-page">
-
       <div className="admin-login-card">
-
         {/* ================= HEADING ================= */}
 
         <div className="admin-login-heading">
-
           <p>SOLESTYLE ADMIN</p>
 
           <h2>Admin Login</h2>
 
-          <span>
-            Sign in to manage your SOLESTYLE store.
-          </span>
-
+          <span>Sign in to manage your SOLESTYLE store.</span>
         </div>
 
         <form onSubmit={handleLogin}>
-
           {/* ================= EMAIL ================= */}
 
           <div className="admin-login-field">
-
-            <label htmlFor="admin-email">
-              EMAIL ADDRESS
-            </label>
+            <label htmlFor="admin-email">EMAIL ADDRESS</label>
 
             <input
               id="admin-email"
@@ -183,23 +144,16 @@ function AdminLogin() {
             />
 
             {errors.email && (
-              <p className="admin-login-error">
-                {errors.email}
-              </p>
+              <p className="admin-login-error">{errors.email}</p>
             )}
-
           </div>
 
           {/* ================= PASSWORD ================= */}
 
           <div className="admin-login-field">
-
-            <label htmlFor="admin-password">
-              PASSWORD
-            </label>
+            <label htmlFor="admin-password">PASSWORD</label>
 
             <div className="admin-password-wrapper">
-
               <input
                 id="admin-password"
                 type={showPassword ? "text" : "password"}
@@ -219,29 +173,21 @@ function AdminLogin() {
               <button
                 type="button"
                 className="admin-show-password"
-                onClick={() =>
-                  setShowPassword(!showPassword)
-                }
+                onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? "HIDE" : "SHOW"}
               </button>
-
             </div>
 
             {errors.password && (
-              <p className="admin-login-error">
-                {errors.password}
-              </p>
+              <p className="admin-login-error">{errors.password}</p>
             )}
-
           </div>
 
           {/* ================= GENERAL ERROR ================= */}
 
           {errors.general && (
-            <p className="admin-login-general-error">
-              {errors.general}
-            </p>
+            <p className="admin-login-general-error">{errors.general}</p>
           )}
 
           {/* ================= LOGIN BUTTON ================= */}
@@ -253,14 +199,10 @@ function AdminLogin() {
           >
             {isLoading ? "LOGGING IN..." : "ADMIN LOGIN"}
           </button>
-
         </form>
-
       </div>
-
     </div>
   );
 }
 
 export default AdminLogin;
-

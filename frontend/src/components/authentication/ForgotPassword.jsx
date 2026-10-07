@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import NotificationModal from "../common/NotificationModal";
+import { forgotPassword } from "../../api/services/authServices";
 import "./ForgotPassword.css";
 
 function ForgotPassword() {
@@ -68,26 +69,8 @@ function ForgotPassword() {
     try {
       setIsLoading(true);
 
-      const response = await fetch(
-        "http://localhost:5001/api/auth/forgot-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: trimmedEmail,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Something went wrong.");
-        return;
-      }
-
+      await forgotPassword(trimmedEmail);
+      
       // Save email for the next page
       sessionStorage.setItem(
         "forgotPasswordEmail",
@@ -102,17 +85,16 @@ function ForgotPassword() {
       );
 
     } catch (error) {
-      console.error("Forgot password error:", error);
+  console.error("Forgot password error:", error);
 
-      setError(
-        "Unable to connect to the server. Please try again."
-      );
-
-    } finally {
-      setIsLoading(false);
+  setError(
+    error.response?.data?.message ||
+    "Unable to connect to the server. Please try again."
+  );
+   } finally {
+     setIsLoading(false);
     }
-  };
-
+  }
   // ================= UI =================
 
   return (

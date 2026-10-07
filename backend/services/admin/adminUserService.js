@@ -1,22 +1,52 @@
 const User = require("../../models/User");
 
-const getAllUsers = async (search) => {
+const getAllUsers = async (
+  search,
+  page = 1,
+  limit = 5
+) => {
   const query = {};
 
   if (search) {
     query.$or = [
-      { name: { $regex: search, $options: "i" } },
-      { email: { $regex: search, $options: "i" } },
+      {
+        name: {
+          $regex: search,
+          $options: "i",
+        },
+      },
+      {
+        email: {
+          $regex: search,
+          $options: "i",
+        },
+      },
     ];
   }
 
+  const skip = (page - 1) * limit;
+
+  const totalUsers = await User.countDocuments(query);
+
   const users = await User.find(query)
     .select("-password")
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
 
-  return users;
+  const totalPages = Math.ceil(
+    totalUsers / limit
+  );
+
+  return {
+    users,
+    pagination: {
+      currentPage: page,
+      totalPages,
+      totalUsers,
+    },
+  };
 };
-
 const getUserById = async (userId) => {
   const user = await User.findById(userId).select("-password");
 

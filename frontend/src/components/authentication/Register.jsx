@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./Register.css";
+import { registerUser } from "../../api/services/authServices";
 
 function Register() {
   const [name, setName] = useState("");
@@ -82,47 +83,16 @@ function Register() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:5001/api/auth/register",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: trimmedName,
-            email: trimmedEmail,
-            password,
-            confirmPassword,
-            referralCode:
-              trimmedReferralCode || undefined,
-          }),
-        }
-      );
+      const data = await registerUser({
+       name: trimmedName,
+        email: trimmedEmail,
+        password,
+        confirmPassword,
+       referralCode:
+       trimmedReferralCode || undefined,
+        });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Backend validation error
-        if (
-          data.message
-            ?.toLowerCase()
-            .includes("email")
-        ) {
-          setErrors({
-            email: data.message,
-          });
-        } else {
-          setErrors({
-            general:
-              data.message || "Registration failed",
-          });
-        }
-
-        return;
-      }
-
-      // ======================== SUCCESS ======================== //
+      // ......................SUCCESS ................ 
 
       // Go to OTP verification page
       // and tell RegisterOtp that OTP was sent
@@ -133,22 +103,27 @@ function Register() {
         },
       });
 
-    } catch (error) {
-      console.error(
-        "Registration error:",
-        error
-      );
+    }catch (error) {
+  console.error(
+    "Registration error:",
+    error
+  );
 
-      setErrors({
-        general:
-          "Something went wrong. Please try again.",
-      });
+  const message =
+    error.response?.data?.message ||
+    "Something went wrong. Please try again.";
 
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  if (message.toLowerCase().includes("email")) {
+    setErrors({
+      email: message,
+    });
+  } else {
+    setErrors({
+      general: message,
+    });
+  }
+}
+  }
   // ======================== CLEAR FIELD ERROR ======================== //
 
   const clearError = (field) => {
