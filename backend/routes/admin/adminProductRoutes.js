@@ -29,10 +29,12 @@ router.get(
   fetchProducts
 );
 
+
 // Edit product
 router.put(
   "/:productId",
   authMiddleware,
+  upload.array("images", 5),
   editProduct
 );
 

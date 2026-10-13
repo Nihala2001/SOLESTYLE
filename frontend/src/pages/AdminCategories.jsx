@@ -1,5 +1,7 @@
+
 import { useEffect, useState } from "react";
 import AdminLayout from "../components/admin/AdminLayout";
+
 import {
   getAdminCategories,
   addAdminCategory,
@@ -7,16 +9,21 @@ import {
   deleteAdminCategory,
   activateAdminCategory,
 } from "../api/services/adminCategoryService";
+
+import NotificationModal from "../components/common/NotificationModal";
+
 import "./AdminCategories.css";
 
 function AdminCategories() {
   const [categories, setCategories] = useState([]);
 
-  // Search
+  // ================= SEARCH =================
+
   const [search, setSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Pagination
+  // ================= PAGINATION =================
+
   const [page, setPage] = useState(1);
 
   const [pagination, setPagination] = useState({
@@ -25,7 +32,8 @@ function AdminCategories() {
     totalCategories: 0,
   });
 
-  // Loading
+  // ================= LOADING =================
+
   const [loading, setLoading] = useState(false);
 
   // ================= ADD CATEGORY STATES =================
@@ -50,181 +58,251 @@ function AdminCategories() {
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  // ================= NOTIFICATION STATES =================
 
-  // ...................FETCH CATEGORIES..............
+  const [notification, setNotification] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "success",
+  });
+
+  const showNotification = (
+    message,
+    type = "success",
+    title = type === "success" ? "Success" : "Error"
+  ) => {
+    setNotification({
+      isOpen: true,
+      title,
+      message,
+      type,
+    });
+  };
+
+  const closeNotification = () => {
+    setNotification((prev) => ({
+      ...prev,
+      isOpen: false,
+    }));
+  };
+
+  // ================= FETCH CATEGORIES =================
 
   const fetchCategories = async () => {
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const data = await getAdminCategories(
-      searchQuery,
-      page,
-      5
-    );
+      const data = await getAdminCategories(
+        searchQuery,
+        page,
+        5
+      );
 
-    setCategories(data.categories || []);
+      setCategories(data.categories || []);
 
-    setPagination(
-      data.pagination || {
-        currentPage: 1,
-        totalPages: 1,
-        totalCategories: 0,
-      }
-    );
-  } catch (error) {
-    console.error(
-      "Fetch categories error:",
-      error
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+      setPagination(
+        data.pagination || {
+          currentPage: 1,
+          totalPages: 1,
+          totalCategories: 0,
+        }
+      );
+    } catch (error) {
+      console.error(
+        "Fetch categories error:",
+        error
+      );
 
+      showNotification(
+        error.response?.data?.message ||
+          "Failed to fetch categories",
+        "error",
+        "Error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  //...............ADD CATEGORY.....................
+  // ================= ADD CATEGORY =================
 
   const handleAddCategory = async () => {
-  const trimmedName = categoryName.trim();
+    const trimmedName = categoryName.trim();
 
-  if (!trimmedName) {
-    setError("Category name is required");
-    return;
-  }
+    if (!trimmedName) {
+      setError("Category name is required");
+      return;
+    }
 
-  try {
-    setAdding(true);
-    setError("");
+    try {
+      setAdding(true);
+      setError("");
 
-    const data = await addAdminCategory({
-      name: trimmedName,
-    });
+      await addAdminCategory({
+        name: trimmedName,
+      });
 
-    // Close modal
-    setShowAddModal(false);
+      // Show success notification
+      showNotification(
+        "Category added successfully",
+        "success",
+        "Category Added"
+      );
 
-    // Clear form
-    setCategoryName("");
-    setError("");
+      // Close modal
+      setShowAddModal(false);
 
-    // Reset search and page
-    setSearch("");
-    setSearchQuery("");
-    setPage(1);
+      // Clear form
+      setCategoryName("");
+      setError("");
 
-  } catch (error) {
-    setError(
-      error.response?.data?.message ||
-        "Failed to add category"
-    );
-  } finally {
-    setAdding(false);
-  }
-};
+      // Reset search and page
+      setSearch("");
+      setSearchQuery("");
+      setPage(1);
 
-  // ..................EDIT CATEGORY....................
+      // Refresh categories
+      fetchCategories();
+    } catch (error) {
+      setError(
+        error.response?.data?.message ||
+          "Failed to add category"
+      );
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  // ================= EDIT CATEGORY =================
 
   const handleEditCategory = async () => {
-  const trimmedName = editCategoryName.trim();
+    const trimmedName = editCategoryName.trim();
 
-  if (!trimmedName) {
-    setEditError("Category name is required");
-    return;
-  }
+    if (!trimmedName) {
+      setEditError("Category name is required");
+      return;
+    }
 
-  if (!editingCategory) {
-    return;
-  }
+    if (!editingCategory) {
+      return;
+    }
 
-  try {
-    setUpdating(true);
-    setEditError("");
+    try {
+      setUpdating(true);
+      setEditError("");
 
-    await updateAdminCategory(
-      editingCategory._id,
-      {
-        name: trimmedName,
-      }
-    );
+      await updateAdminCategory(
+        editingCategory._id,
+        {
+          name: trimmedName,
+        }
+      );
 
-    // Close modal
-    setShowEditModal(false);
+      // Show success notification
+      showNotification(
+        "Category updated successfully",
+        "success",
+        "Category Updated"
+      );
 
-    // Clear edit data
-    setEditingCategory(null);
-    setEditCategoryName("");
-    setEditError("");
+      // Close modal
+      setShowEditModal(false);
 
-    // Refresh list
-    fetchCategories();
+      // Clear edit data
+      setEditingCategory(null);
+      setEditCategoryName("");
+      setEditError("");
 
-  } catch (error) {
-    setEditError(
-      error.response?.data?.message ||
-        "Failed to update category"
-    );
-  } finally {
-    setUpdating(false);
-  }
-};
+      // Refresh list
+      fetchCategories();
+    } catch (error) {
+      setEditError(
+        error.response?.data?.message ||
+          "Failed to update category"
+      );
+    } finally {
+      setUpdating(false);
+    }
+  };
 
-
-  //.......................DELETE CATEGORY...................
+  // ================= DELETE CATEGORY =================
 
   const handleDeleteCategory = async () => {
-  if (!deletingCategory) {
-    return;
-  }
+    if (!deletingCategory) {
+      return;
+    }
 
-  try {
-    setDeleting(true);
-    setDeleteError("");
+    try {
+      setDeleting(true);
+      setDeleteError("");
 
-    await deleteAdminCategory(
-      deletingCategory._id
-    );
+      await deleteAdminCategory(
+        deletingCategory._id
+      );
 
-    // Close modal
-    setShowDeleteModal(false);
+      // Show success notification
+      showNotification(
+        "Category deleted successfully",
+        "success",
+        "Category Deleted"
+      );
 
-    // Clear delete data
-    setDeletingCategory(null);
-    setDeleteError("");
+      // Close modal
+      setShowDeleteModal(false);
 
-    // Refresh list
-    fetchCategories();
+      // Clear delete data
+      setDeletingCategory(null);
+      setDeleteError("");
 
-  } catch (error) {
-    console.error(
-      "Delete category error:",
-      error
-    );
+      // Refresh list
+      fetchCategories();
+    } catch (error) {
+      console.error(
+        "Delete category error:",
+        error
+      );
 
-    setDeleteError(
-      error.response?.data?.message ||
-        "Failed to delete category"
-    );
+      setDeleteError(
+        error.response?.data?.message ||
+          "Failed to delete category"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
 
-  } finally {
-    setDeleting(false);
-  }
-};
-  //...handle category reactivate............//
+  // ================= ACTIVATE CATEGORY =================
 
-  const handleActivateCategory = async (categoryId) => {
-  try {
-    await activateAdminCategory(categoryId);
+  const handleActivateCategory = async (
+    categoryId
+  ) => {
+    try {
+      await activateAdminCategory(categoryId);
 
-    fetchCategories();
-  } catch (error) {
-    console.error(
-      "Activate category error:",
-      error
-    );
-  }
-};
+      // Show success notification
+      showNotification(
+        "Category activated successfully",
+        "success",
+        "Category Activated"
+      );
 
+      // Refresh list
+      fetchCategories();
+    } catch (error) {
+      console.error(
+        "Activate category error:",
+        error
+      );
+
+      showNotification(
+        error.response?.data?.message ||
+          "Failed to activate category",
+        "error",
+        "Error"
+      );
+    }
+  };
 
   // ================= LOAD CATEGORIES =================
 
@@ -232,14 +310,12 @@ function AdminCategories() {
     fetchCategories();
   }, [page, searchQuery]);
 
-
   // ================= SEARCH =================
 
   const handleSearch = () => {
     setPage(1);
     setSearchQuery(search);
   };
-
 
   // ================= CLEAR =================
 
@@ -249,9 +325,8 @@ function AdminCategories() {
     setPage(1);
   };
 
-
   return (
-    < AdminLayout title="Categories">
+    <AdminLayout title="Categories">
 
       {/* ================= HEADER ================= */}
 
@@ -279,7 +354,6 @@ function AdminCategories() {
         </button>
 
       </div>
-
 
       {/* ================= SEARCH ================= */}
 
@@ -311,7 +385,6 @@ function AdminCategories() {
         </button>
 
       </div>
-
 
       {/* ================= ADD CATEGORY MODAL ================= */}
 
@@ -394,7 +467,6 @@ function AdminCategories() {
 
         </div>
       )}
-
 
       {/* ================= EDIT CATEGORY MODAL ================= */}
 
@@ -481,7 +553,6 @@ function AdminCategories() {
         </div>
       )}
 
-
       {/* ================= DELETE CATEGORY MODAL ================= */}
 
       {showDeleteModal && deletingCategory && (
@@ -553,7 +624,6 @@ function AdminCategories() {
 
         </div>
       )}
-
 
       {/* ================= CATEGORY TABLE ================= */}
 
@@ -646,28 +716,31 @@ function AdminCategories() {
                         Edit
                       </button>
 
-
-                      {/* DELETE */}
+                      {/* DELETE / ACTIVATE */}
 
                       {category.isActive ? (
-  <button
-    className="delete-button"
-    onClick={() => {
-      setDeletingCategory(category);
-      setDeleteError("");
-      setShowDeleteModal(true);
-    }}
-  >
-    Delete
-  </button>
-) : (
-  <button
-    className="activate-button"
-    onClick={() => handleActivateCategory(category._id)}
-  >
-    Activate
-  </button>
-)}
+                        <button
+                          className="delete-button"
+                          onClick={() => {
+                            setDeletingCategory(category);
+                            setDeleteError("");
+                            setShowDeleteModal(true);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      ) : (
+                        <button
+                          className="activate-button"
+                          onClick={() =>
+                            handleActivateCategory(
+                              category._id
+                            )
+                          }
+                        >
+                          Activate
+                        </button>
+                      )}
 
                     </td>
 
@@ -683,7 +756,6 @@ function AdminCategories() {
         )}
 
       </div>
-
 
       {/* ================= PAGINATION ================= */}
 
@@ -724,6 +796,16 @@ function AdminCategories() {
         </div>
 
       )}
+
+      {/* ================= NOTIFICATION ================= */}
+
+      <NotificationModal
+        isOpen={notification.isOpen}
+        onClose={closeNotification}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+      />
 
     </AdminLayout>
   );

@@ -1,0 +1,145 @@
+.image-help-text {
+  margin: -5px 0 15px;
+  font-size: 13px;
+  color: #777;
+}
+
+.variant-edit-image-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.variant-image-wrapper {
+  position: relative;
+  width: 110px;
+  height: 110px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.variant-image-wrapper:hover {
+  border-color: #d98c9a;
+}
+
+.variant-image-wrapper.selected {
+  border-color: #c96f82;
+}
+
+.variant-edit-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.main-image-badge {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  padding: 5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 11px;
+  text-align: center;
+}
+
+.image-updating-text {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #777;
+}
+/* Variant image editing */
+
+.variant-edit-images {
+  margin-bottom: 24px;
+}
+
+.variant-edit-image-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.variant-image-wrapper {
+  position: relative;
+  width: 130px;
+  height: 140px;
+}
+
+.variant-image-select {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 5px;
+  overflow: hidden;
+  border: 2px solid #e5d7d0;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.variant-image-select.selected {
+  border-color: #c65d87;
+}
+
+.variant-edit-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.main-image-badge,
+.new-image-label {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: #c65d87;
+  color: white;
+  font-size: 11px;
+}
+
+.remove-variant-image {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: #d93652;
+  color: white;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.remove-variant-image:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.add-variant-images-button {
+  display: inline-block;
+  margin-right: 12px;
+  padding: 10px 16px;
+  border: 1px solid #c65d87;
+  border-radius: 8px;
+  color: #a83f6a;
+  cursor: pointer;
+}
+
+.add-variant-images-button:hover {
+  background: #fff0f5;
+}

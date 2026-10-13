@@ -114,6 +114,14 @@ export const getAdminUsers = async (
   return response.data;
 };
 
+// Get single customer
+export const getAdminUser = async (userId) => {
+  const response = await api.get(`/admin/users/${userId}`);
+
+  return response.data;
+};
+
+
 // Block user
 export const blockUser = async (userId) => {
   const response = await api.patch(
@@ -129,5 +137,32 @@ export const unblockUser = async (userId) => {
     `/admin/users/${userId}/unblock`
   );
 
+  return response.data;
+};
+
+ 
+// .............. ADMIN VARIANTS ..............
+
+// Get variants for a product
+export const getAdminProductVariants = async (productId) => {
+  const response = await api.get(`/admin/variants/${productId}`);
+  return response.data;
+};
+
+// Create variants for a product
+export const createAdminProductVariants = async (formData) => {
+  const response = await api.post("/admin/variants", formData);
+  return response.data;
+};
+
+// Update the main image for a color
+export const updateAdminVariantMainImage = async (
+  productId,
+  data
+) => {
+  const response = await api.patch(
+    `/admin/variants/${productId}/main-image`,
+    data
+  );
   return response.data;
 };

@@ -1,4 +1,5 @@
 const User = require("../../models/User");
+const Address = require("../../models/Address");
 
 const getAllUsers = async (
   search,
@@ -47,14 +48,34 @@ const getAllUsers = async (
     },
   };
 };
+
 const getUserById = async (userId) => {
-  const user = await User.findById(userId).select("-password");
+  const user = await User.findById(userId)
+    .select("-password")
+    .lean();
 
   if (!user) {
     throw new Error("User not found");
   }
 
-  return user;
+  const addresses = await Address.find({
+    userId: userId,
+  })
+    .sort({
+      isDefault: -1,
+      createdAt: -1,
+    })
+    .lean();
+
+  console.log("================================");
+  console.log("ADMIN VIEW USER ID:", userId);
+  console.log("FOUND ADDRESSES:", addresses);
+  console.log("================================");
+
+  return {
+    ...user,
+    addresses,
+  };
 };
 
 const blockUser = async (userId) => {
@@ -65,6 +86,7 @@ const blockUser = async (userId) => {
   }
 
   user.isActive = false;
+
   await user.save();
 
   return user;
@@ -78,6 +100,7 @@ const unblockUser = async (userId) => {
   }
 
   user.isActive = true;
+
   await user.save();
 
   return user;

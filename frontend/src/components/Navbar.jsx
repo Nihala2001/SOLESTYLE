@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Search,
@@ -8,12 +9,33 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { getActiveCategories } from "../api/services/userCategoryService";
 import "./Navbar.css";
 
 function Navbar() {
   const navigate = useNavigate();
 
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [categoryDropdown, setCategoryDropdown] = useState(false);
+  const [categories, setCategories] = useState([]);
+
+  // ================= GET ACTIVE CATEGORIES =================
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await getActiveCategories();
+
+        if (data.success) {
+          setCategories(data.categories);
+        }
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // Get the same token that is saved during login
   const token = localStorage.getItem("userToken");
@@ -34,7 +56,7 @@ function Navbar() {
       {/* ================= LOGO ================= */}
 
       <Link
-        to="/home"
+        to="/"
         className="navbar-logo"
       >
         SOLESTYLE
@@ -45,20 +67,54 @@ function Navbar() {
 
       <div className="navbar-links">
 
-        <Link to="/home">
+        <Link to="/">
           Home
         </Link>
 
-        <Link to="/products?category=sneakers">
-          Sneakers
+        <Link to="/products">
+          Shop
         </Link>
 
-        <Link to="/products?category=heels">
-          Heels
-        </Link>
 
-        <Link to="/products?category=flats">
-          Flats
+        {/* ================= CATEGORIES ================= */}
+
+        <div className="category-dropdown">
+
+          <button
+            type="button"
+            className="category-dropdown-button"
+            onClick={() =>
+              setCategoryDropdown(!categoryDropdown)
+            }
+          >
+            Categories
+          </button>
+
+          {categoryDropdown && (
+            <div className="category-dropdown-menu">
+
+              {categories.map((category) => (
+                <Link
+                  key={category._id}
+                  to={`/products?category=${category._id}`}
+                  className="category-dropdown-item"
+                  onClick={() =>
+                    setCategoryDropdown(false)
+                  }
+                >
+                  {category.name}
+                </Link>
+              ))}
+
+            </div>
+          )}
+
+        </div>
+
+        {/* ================= ABOUT US ================= */}
+
+        <Link to="/about">
+          About Us
         </Link>
 
       </div>
@@ -134,11 +190,10 @@ function Navbar() {
       {/* ================= MOBILE MENU ================= */}
 
       {mobileMenu && (
-
         <div className="mobile-menu">
 
           <Link
-            to="/home"
+            to="/"
             onClick={() =>
               setMobileMenu(false)
             }
@@ -148,36 +203,65 @@ function Navbar() {
 
 
           <Link
-            to="/products?category=sneakers"
+            to="/products"
             onClick={() =>
               setMobileMenu(false)
             }
           >
-            Sneakers
+            Shop
           </Link>
 
+
+          {/* ================= MOBILE CATEGORIES ================= */}
+
+          <div className="mobile-category-section">
+
+            <button
+              type="button"
+              className="mobile-category-button"
+              onClick={() =>
+                setCategoryDropdown(!categoryDropdown)
+              }
+            >
+              Categories
+            </button>
+
+
+            {categoryDropdown && (
+              <div className="mobile-category-list">
+
+                {categories.map((category) => (
+                  <Link
+                    key={category._id}
+                    to={`/products?category=${category._id}`}
+                    onClick={() => {
+                      setCategoryDropdown(false);
+                      setMobileMenu(false);
+                    }}
+                  >
+                    {category.name}
+                  </Link>
+                ))}
+
+              </div>
+            )}
+
+          </div>
+
+
+          {/* ================= ABOUT US ================= */}
 
           <Link
-            to="/products?category=heels"
+            to="/about"
             onClick={() =>
               setMobileMenu(false)
             }
           >
-            Heels
+            About Us
           </Link>
 
 
-          <Link
-            to="/products?category=flats"
-            onClick={() =>
-              setMobileMenu(false)
-            }
-          >
-            Flats
-          </Link>
-
-
-          {/* Profile */}
+          {/* ================= PROFILE ================= */}
 
           <button onClick={handleProfile}>
             <User size={18} />
@@ -185,7 +269,7 @@ function Navbar() {
           </button>
 
 
-          {/* Wishlist */}
+          {/* ================= WISHLIST ================= */}
 
           <button
             onClick={() => {
@@ -198,7 +282,7 @@ function Navbar() {
           </button>
 
 
-          {/* Cart */}
+          {/* ================= CART ================= */}
 
           <button
             onClick={() => {
@@ -211,7 +295,6 @@ function Navbar() {
           </button>
 
         </div>
-
       )}
 
     </nav>

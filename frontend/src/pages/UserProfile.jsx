@@ -827,47 +827,46 @@ function UserProfile() {
   // ================= DELETE ADDRESS =================
 
   const handleDeleteAddressApi = async (addressId) => {
-  try {
-    const data = await deleteAddress(addressId);
+    try {
+      const data = await deleteAddress(addressId);
 
-    if (data.success) {
-      fetchAddresses();
+      if (data.success) {
+        fetchAddresses();
+
+        showNotificationMessage(
+          "Address Deleted",
+          data.message || "The address has been deleted successfully.",
+          "success",
+        );
+      } else {
+        showNotificationMessage(
+          "Delete Failed",
+          data.message || "Unable to delete the address.",
+          "error",
+        );
+      }
+    } catch (error) {
+      console.error("Delete address error:", error);
 
       showNotificationMessage(
-        "Address Deleted",
-        data.message ||
-          "The address has been deleted successfully.",
-        "success",
-      );
-    } else {
-      showNotificationMessage(
-        "Delete Failed",
-        data.message || "Unable to delete the address.",
+        "Something Went Wrong",
+        error.response?.data?.message ||
+          "Unable to delete the address. Please try again.",
         "error",
       );
     }
-  } catch (error) {
-    console.error("Delete address error:", error);
-
-    showNotificationMessage(
-      "Something Went Wrong",
-      error.response?.data?.message ||
-        "Unable to delete the address. Please try again.",
-      "error",
-    );
-  }
-};
+  };
 
   // ================= DELETE CONFIRMATION =================
 
   const handleDeleteAddress = (addressId) => {
-  showConfirmationMessage(
-    "Delete Address?",
-    "Are you sure you want to delete this address?",
-    () => handleDeleteAddressApi(addressId),
-    "Delete",
-  );
-};
+    showConfirmationMessage(
+      "Delete Address?",
+      "Are you sure you want to delete this address?",
+      () => handleDeleteAddressApi(addressId),
+      "Delete",
+    );
+  };
 
   // ================= SET DEFAULT =================
 
@@ -950,7 +949,7 @@ function UserProfile() {
           <span>My Orders</span>
         </button>
 
-        <button className="sidebar-item">
+        <button className="sidebar-item" onClick={() => navigate("/wishlist")}>
           <Heart size={18} />
           <span>Wishlist</span>
         </button>

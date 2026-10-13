@@ -1,5 +1,6 @@
 const Product = require("../../models/Product");
 const Category = require("../../models/Category");
+const Variant = require("../../models/Variant");
 
 // ================= ADD PRODUCT =================
 
@@ -44,12 +45,10 @@ const getProducts = async ({
 }) => {
   const pageNumber = Number(page);
   const limitNumber = Number(limit);
-
   const skip = (pageNumber - 1) * limitNumber;
 
   const query = {};
 
-  // Search by product name
   if (search.trim()) {
     query.name = {
       $regex: search.trim(),
@@ -57,7 +56,6 @@ const getProducts = async ({
     };
   }
 
-  // Filter by category
   if (categoryId) {
     query.categoryId = categoryId;
   }
@@ -66,16 +64,59 @@ const getProducts = async ({
 
   const products = await Product.find(query)
     .populate("categoryId", "name")
-    .sort({ isActive: -1, name: 1 })
+    .sort({
+      isActive: -1,
+      name: 1,
+    })
     .skip(skip)
-    .limit(limitNumber);
+    .limit(limitNumber)
+    .lean();
 
-  const totalPages = Math.ceil(
-    totalProducts / limitNumber
-  );
+  const productIds = products.map((product) => product._id);
+
+  const variants = await Variant.find({
+    productId: { $in: productIds },
+    isActive: true,
+  })
+    .select("productId color productImages mainImage")
+    .lean();
+
+  const productsWithImages = products.map((product) => {
+    const productVariants = variants.filter(
+      (variant) =>
+        variant.productId.toString() === product._id.toString()
+    );
+
+    // Prefer the color selected by the admin.
+    const selectedColorVariant = productVariants.find(
+      (variant) =>
+        product.displayColor &&
+        variant.color?.trim().toLowerCase() ===
+          product.displayColor.trim().toLowerCase()
+    );
+
+    // Fallback if the selected color no longer has an active variant.
+    const fallbackVariant = productVariants[0];
+
+    const chosenVariant = selectedColorVariant || fallbackVariant;
+
+    const displayImage =
+      chosenVariant?.mainImage ||
+      chosenVariant?.productImages?.[0] ||
+      product.images?.[0] ||
+      null;
+
+    return {
+      ...product,
+      displayImage,
+      displayColor: chosenVariant?.color || product.displayColor || "",
+    };
+  });
+
+  const totalPages = Math.ceil(totalProducts / limitNumber);
 
   return {
-    products,
+    products: productsWithImages,
     pagination: {
       currentPage: pageNumber,
       totalPages,
@@ -84,8 +125,6 @@ const getProducts = async ({
     },
   };
 };
-
-
 // ================= UPDATE PRODUCT =================
 
 const updateProduct = async (
@@ -120,13 +159,25 @@ const updateProduct = async (
   const updatedProduct = await Product.findByIdAndUpdate(
     productId,
     {
-      ...(name !== undefined && { name: name.trim() }),
+      ...(name !== undefined && {
+        name: name.trim(),
+      }),
+
       ...(description !== undefined && {
         description: description.trim(),
       }),
-      ...(categoryId !== undefined && { categoryId }),
-      ...(basePrice !== undefined && { basePrice }),
-      ...(images !== undefined && { images }),
+
+      ...(categoryId !== undefined && {
+        categoryId,
+      }),
+
+      ...(basePrice !== undefined && {
+        basePrice,
+      }),
+
+      ...(images !== undefined && {
+        images,
+      }),
     },
     {
       new: true,
@@ -136,7 +187,6 @@ const updateProduct = async (
 
   return updatedProduct;
 };
-
 
 // ================= SOFT DELETE =================
 
@@ -158,7 +208,6 @@ const deleteProduct = async (productId) => {
   return product;
 };
 
-
 // ================= ACTIVATE PRODUCT =================
 
 const activateProduct = async (productId) => {
@@ -179,6 +228,7 @@ const activateProduct = async (productId) => {
   return product;
 };
 
+// ================= EXPORTS =================
 
 module.exports = {
   addProduct,

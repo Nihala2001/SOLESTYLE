@@ -356,3 +356,35 @@
     padding: 60px 25px;
   }
 }
+/* ================= HERO AUTH BUTTONS ================= */
+
+.hero-auth-buttons {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+}
+
+.hero-secondary-button {
+  width: fit-content;
+
+  padding: 13px 27px;
+
+  border: 1px solid #8f5360;
+
+  color: #8f5360;
+
+  font-size: 12px;
+  font-weight: bold;
+
+  letter-spacing: 1px;
+
+  transition: 0.2s;
+}
+
+.hero-secondary-button:hover {
+  background-color: #8f5360;
+
+  color: #ffffff;
+}

@@ -36,8 +36,8 @@ const createProduct = async (req, res) => {
       description,
       categoryId,
       basePrice,
-    } = req.body;
-
+      existingImages,
+    } = req.body || {};
     if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
@@ -134,8 +134,6 @@ const fetchProducts = async (req, res) => {
     });
   }
 };
-
-
 // ================= UPDATE PRODUCT =================
 
 const editProduct = async (req, res) => {
@@ -147,7 +145,7 @@ const editProduct = async (req, res) => {
       description,
       categoryId,
       basePrice,
-      images,
+      existingImages,
     } = req.body;
 
     if (name !== undefined && !name.trim()) {
@@ -164,12 +162,43 @@ const editProduct = async (req, res) => {
       });
     }
 
+    // Existing images kept by the admin
+    let finalImages = [];
+
+    if (existingImages) {
+      finalImages = JSON.parse(existingImages);
+    }
+
+    // Upload newly added images to Cloudinary
+    const files = req.files || [];
+
+    for (const file of files) {
+      const imageUrl = await uploadImageToCloudinary(file);
+      finalImages.push(imageUrl);
+    }
+
+    // Product must have at least 3 images
+    if (finalImages.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Product must have at least 3 images",
+      });
+    }
+
+    // Product can have maximum 5 images
+    if (finalImages.length > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Product can have a maximum of 5 images",
+      });
+    }
+
     const product = await updateProduct(productId, {
       name,
       description,
       categoryId,
       basePrice,
-      images,
+      images: finalImages,
     });
 
     return res.status(200).json({
@@ -186,7 +215,6 @@ const editProduct = async (req, res) => {
     });
   }
 };
-
 
 // ================= SOFT DELETE =================
 

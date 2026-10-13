@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import "./AdminLayout.css";
 
@@ -41,19 +40,27 @@ function AdminLayout({ children, title }) {
             Users
           </button>
 
-          <button className="menu-item">
+          <button
+            onClick={() => navigate("/admin/products")}
+            className="menu-item"
+          >
             <span>▣</span>
             Products
           </button>
 
-          <button className="menu-item">
+          <button
+          onClick={() => navigate("/admin/orders")}  
+          className="menu-item">
             <span>▤</span>
             Orders
           </button>
 
-          <button onClick={() => navigate("/admin/categories")} className="menu-item">
+          <button
+            onClick={() => navigate("/admin/categories")}
+            className="menu-item"
+          >
             <span>◈</span>
-             Categories
+            Categories
           </button>
 
           <button className="menu-item">
@@ -110,7 +117,11 @@ function AdminLayout({ children, title }) {
             <p>Manage your SOLESTYLE store</p>
           </div>
 
-         <div className="admin-profile" onClick={() => navigate("/admin/profile")} style={{ cursor: "pointer" }} >
+          <div
+            className="admin-profile"
+            onClick={() => navigate("/admin/profile")}
+            style={{ cursor: "pointer" }}
+          >
             <div className="admin-avatar">
               {admin?.name?.charAt(0).toUpperCase() || "A"}
             </div>
@@ -122,13 +133,10 @@ function AdminLayout({ children, title }) {
           </div>
         </header>
 
-        <section className="admin-content">
-          {children}
-        </section>
+        <section className="admin-content">{children}</section>
       </main>
     </div>
   );
 }
 
 export default AdminLayout;
-

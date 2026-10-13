@@ -1,0 +1,214 @@
+
+.user-details-page {
+  width: 100%;
+}
+
+/* ================= BACK BUTTON ================= */
+
+.back-button {
+  border: none;
+  background: transparent;
+  color: #c9788b;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 20px;
+}
+
+.back-button:hover {
+  color: #a85f70;
+}
+
+/* ================= CARD ================= */
+
+.user-details-card {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-sizing: border-box;
+}
+
+/* ================= HEADER ================= */
+
+.user-details-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-bottom: 25px;
+  border-bottom: 1px solid #eee;
+}
+
+.user-details-avatar {
+  width: 75px;
+  height: 75px;
+  border-radius: 50%;
+  background: #f8dce2;
+  color: #b96c7d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.user-details-header h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.user-details-header p {
+  margin: 0;
+  color: #777;
+  font-size: 14px;
+}
+
+/* ================= STATUS ================= */
+
+.user-details-status {
+  margin-top: 20px;
+}
+
+.user-details-status .status {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.user-details-status .status.active {
+  background: #e8f7ed;
+  color: #258a48;
+}
+
+.user-details-status .status.blocked {
+  background: #fbeaea;
+  color: #c0392b;
+}
+
+/* ================= INFORMATION ================= */
+
+.user-details-section {
+  margin-top: 30px;
+}
+
+.user-details-section h2 {
+  margin: 0 0 20px;
+  font-size: 18px;
+}
+
+.user-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+
+.user-detail-item {
+  padding: 18px;
+  background: #faf4f5;
+  border-radius: 8px;
+}
+
+.user-detail-item span {
+  display: block;
+  color: #777;
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+
+.user-detail-item strong {
+  font-size: 14px;
+  color: #333;
+}
+
+/* ================= LOADING / EMPTY ================= */
+
+.user-details-loading,
+.user-details-empty {
+  background: white;
+  border-radius: 12px;
+  padding: 50px;
+  text-align: center;
+  color: #777;
+}
+
+.user-details-empty h2 {
+  color: #333;
+  margin-bottom: 8px;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 768px) {
+  .user-details-card {
+    padding: 20px;
+  }
+
+  .user-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-details-header h1 {
+    font-size: 20px;
+  }
+}
+.user-address-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.user-address-card {
+  border: 1px solid #eadfd8;
+  border-radius: 12px;
+  padding: 18px;
+  background: #fffaf7;
+}
+
+.user-address-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.user-address-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #3f3029;
+  text-transform: capitalize;
+}
+
+.default-address-badge {
+  background: #f4d6df;
+  color: #8a3f58;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.user-address-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.user-address-content p {
+  margin: 0;
+  color: #5f514b;
+  font-size: 14px;
+}
+
+.user-address-content p strong {
+  color: #332722;
+  font-size: 15px;
+}
+
+.no-address-message {
+  margin: 0;
+  color: #777;
+  font-size: 14px;
+}
