@@ -393,13 +393,7 @@ function Cart() {
             <button
               type="button"
               className="cart-checkout-button"
-              onClick={() =>
-                showNotification(
-                  "Checkout",
-                  "Checkout will be available when payment is implemented.",
-                  "info"
-                )
-              }
+              onClick={() => navigate("/checkout")}
             >
               Proceed to Checkout
             </button>

@@ -113,8 +113,13 @@ function UserProfile() {
   // ================= FETCH PROFILE =================
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+  fetchProfile();
+
+  if (window.location.hash === "#addresses") {
+    setShowAddresses(true);
+    fetchAddresses();
+  }
+}, []);
 
   // ================= NOTIFICATION FUNCTIONS =================
 

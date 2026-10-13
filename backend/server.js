@@ -10,6 +10,9 @@ const productRoutes = require("./routes/user/productRoutes");
 const variantRoutes = require("./routes/user/variantRoutes")
 const cartRoutes = require("./routes/user/cartRoutes");
 const wishlistRoutes = require("./routes/user/wishlistRoutes");
+const orderRoutes = require("./routes/user/orderRoutes");
+
+
 
 const adminAuthRoutes = require("./routes/admin/adminAuthRoutes");
 const adminUserRoutes = require("./routes/admin/adminUserRoutes");
@@ -32,6 +35,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/variants", variantRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/orders", orderRoutes);
 
 
 app.use("/api/admin", adminAuthRoutes);
