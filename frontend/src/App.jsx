@@ -11,7 +11,6 @@ import ForgotPassword from "./components/authentication/ForgotPassword";
 import ForgotPasswordOtp from "./components/authentication/ForgotPasswordOtp";
 import ResetPassword from "./components/authentication/ResetPassword";
 
-
 import Home from "./pages/Home";
 import UserProfile from "./pages/UserProfile";
 import Products from "./pages/Products";
@@ -19,6 +18,8 @@ import ProductDetails from "./pages/ProductDetails";
 import Cart from "./pages/Cart";
 import Wishlist from "./pages/Wishlist";
 import Checkout from "./pages/Checkout";
+import OrderTracking from "./pages/OrderTracking";
+import Wallet from "./pages/Wallet";
 
 
 import AdminLogin from "./components/admin/AdminLogin";
@@ -27,11 +28,15 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminProfile from "./pages/AdminProfile";
 import AdminCategories from "./pages/AdminCategories";
 import AdminProducts from "./pages/AdminProducts";
+import AdminOrders from "./pages/AdminOrders";
 import AdminUserDetails from "./pages/AdminUserDetails";
 import AdminAddProduct from "./pages/AdminAddProduct";
 import AdminProductDetails from "./pages/AdminProductDetails";
 import AdminEditVariant from "./pages/AdminEditVariant";
 import AdminEditProduct from "./pages/AdminEditProduct";
+import AdminReturns from "./pages/AdminReturns";
+import AdminCoupons from "./pages/AdminCoupons";
+import AdminOffers from "./pages/AdminOffers";
 
 function App() {
   return (
@@ -54,9 +59,13 @@ function App() {
 
           <Route path="/cart" element={<Cart />} />
 
-          <Route path="/wishlist"  element={<Wishlist />} />
+          <Route path="/wishlist" element={<Wishlist />} />
 
-          <Route path="/checkout" element={<Checkout/>}  />
+          <Route path="/checkout" element={<Checkout />} />
+
+          <Route path="/orders/:orderId/track" element={<OrderTracking />} />
+
+          <Route path="/wallet" element={<Wallet />} />
         </Route>
 
         {/* ================= AUTHENTICATION ================= */}
@@ -87,6 +96,8 @@ function App() {
 
         <Route path="/admin/products" element={<AdminProducts />} />
 
+        <Route path="/admin/orders" element={<AdminOrders />} />
+
         <Route path="/admin/users/:id" element={<AdminUserDetails />} />
 
         <Route path="/admin/products/add" element={<AdminAddProduct />} />
@@ -105,6 +116,13 @@ function App() {
           path="/admin/products/:productId/edit"
           element={<AdminEditProduct />}
         />
+
+        <Route path="/admin/returns" element={<AdminReturns />} />
+
+        <Route path="/admin/coupons" element={<AdminCoupons />} />
+
+        <Route path="/admin/offers" element={<AdminOffers />} />
+
       </Routes>
     </BrowserRouter>
   );

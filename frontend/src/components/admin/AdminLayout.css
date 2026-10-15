@@ -52,14 +52,6 @@
   overflow-y: auto;
 }
 
-.menu-title {
-  margin: 15px 10px 8px;
-  color: #987b7b;
-  font-size: 10px;
-  font-weight: bold;
-  letter-spacing: 1.5px;
-}
-
 .menu-item {
   width: 100%;
   border: none;
@@ -115,84 +107,100 @@
 /* ================= MAIN ================= */
 
 .admin-main {
-  margin-left: 250px;
-  width: calc(100% - 250px);
-  min-height: 100vh;
+margin-left: 250px;
+width: calc(100% - 250px);
+min-width: 0;
+min-height: 100vh;
+flex: 1;
 }
 
 .admin-topbar {
-  height: 90px;
-  background: #fffaf7;
-  border-bottom: 1px solid #eadbd4;
-  padding: 0 35px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+min-height: 90px;
+background: #fffaf7;
+border-bottom: 1px solid #eadbd4;
+padding: 0 24px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 16px;
 }
 
 .admin-topbar h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #3d3030;
+margin: 0;
+font-size: 24px;
+color: #3d3030;
 }
 
 .admin-topbar p {
-  margin: 5px 0 0;
-  color: #967f7f;
-  font-size: 13px;
+margin: 5px 0 0;
+color: #967f7f;
+font-size: 13px;
 }
 
 .admin-profile {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+display: flex;
+align-items: center;
+gap: 10px;
 }
 
 .admin-profile strong {
-  display: block;
-  font-size: 14px;
+display: block;
+font-size: 14px;
 }
 
 .admin-profile span {
-  display: block;
-  color: #9a8585;
-  font-size: 11px;
-  margin-top: 3px;
+display: block;
+color: #9a8585;
+font-size: 11px;
+margin-top: 3px;
 }
 
 .admin-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: #b85c70;
-  color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-weight: bold;
+width: 42px;
+height: 42px;
+border-radius: 50%;
+background: #b85c70;
+color: white;
+display: flex;
+justify-content: center;
+align-items: center;
+font-weight: bold;
+flex-shrink: 0;
 }
 
 .admin-content {
-  padding: 30px 35px;
+width: 100%;
+min-width: 0;
+padding: 24px;
+overflow-x: hidden;
 }
 
 /* ================= MOBILE ================= */
 
 @media (max-width: 768px) {
-  .admin-sidebar {
-    width: 200px;
-  }
+.admin-sidebar {
+width: 200px;
+}
 
-  .admin-main {
-    margin-left: 200px;
-    width: calc(100% - 200px);
-  }
+.admin-main {
+margin-left: 200px;
+width: calc(100% - 200px);
+}
 
-  .admin-topbar {
-    padding: 0 20px;
-  }
+.admin-topbar {
+padding: 0 12px;
+gap: 8px;
+}
 
-  .admin-content {
-    padding: 20px;
-  }
+.admin-topbar h2 {
+font-size: 18px;
+}
+
+.admin-profile {
+gap: 6px;
+}
+
+.admin-content {
+padding: 12px;
+}
 }

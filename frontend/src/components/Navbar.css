@@ -353,3 +353,49 @@
   }
 
 }
+
+
+/* ================= CART & WISHLIST COUNT BADGES ================= */
+
+.nav-icon-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.navbar-icon .nav-icon-wrapper {
+  width: 25px;
+  height: 25px;
+  overflow: visible;
+}
+
+.nav-count-badge {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  z-index: 10;
+
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50px;
+  background-color: #b76e79;
+  color: #ffffff;
+
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+
+  border: 2px solid #fffaf7;
+  box-sizing: border-box;
+  white-space: nowrap;
+  pointer-events: none;
+}

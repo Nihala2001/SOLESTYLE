@@ -741,4 +741,191 @@
   font-size: 13px;
   margin-bottom: 20px;
 }
+/* ================= MY ORDERS ================= */
 
+.my-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.my-order-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.my-order-header,
+.my-order-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.my-order-header h3 {
+  margin: 0 0 6px;
+}
+
+.my-order-header p,
+.my-order-item p {
+  margin: 5px 0;
+  color: #75666a;
+  font-size: 14px;
+}
+
+.my-order-status {
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: #f8e8ed;
+  color: #a85d77;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.my-order-items {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.my-order-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee4e5;
+}
+
+.my-order-item img {
+  width: 75px;
+  height: 75px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.my-order-footer {
+  padding-top: 5px;
+}
+
+.my-order-footer p {
+  margin: 0;
+}
+.my-order-item-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.return-exchange-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.return-exchange-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.return-exchange-form textarea {
+  width: 100%;
+  max-width: 400px;
+  padding: 10px;
+  border: 1px solid #e5d5da;
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.return-exchange-error {
+  color: #c0392b;
+  font-size: 14px;
+}
+
+.return-exchange-status {
+  color: #a85d77;
+  font-weight: 600;
+}
+.return-exchange-form h4 {
+  margin: 18px 0 8px;
+  color: #8f5361;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.return-exchange-description {
+  margin: 0 0 16px;
+  color: #6f625f;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.replacement-selection-hint {
+  margin: 10px 0;
+  padding: 12px;
+  background: #faf4ef;
+  border-radius: 8px;
+  color: #796a63;
+  font-size: 13px;
+}
+
+.return-exchange-reason-label {
+  display: block;
+  margin: 16px 0 8px;
+  color: #554743;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.return-exchange-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e5d4ce;
+  border-radius: 8px;
+  background: #fffdfb;
+  color: #493d39;
+  font: inherit;
+  resize: vertical;
+}
+
+.return-exchange-form textarea:focus {
+  outline: none;
+  border-color: #c47d91;
+  box-shadow: 0 0 0 3px rgba(196, 125, 145, 0.12);
+}
+
+.return-exchange-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.return-exchange-form-actions button {
+  margin: 0;
+}
+
+.return-exchange-cancel-btn {
+  background: #f3e8df;
+  color: #705b52;
+}
+
+.return-exchange-cancel-btn:hover {
+  background: #e9d9ce;
+}
+
+@media (max-width: 480px) {
+  .return-exchange-form-actions {
+    flex-direction: column;
+  }
+
+  .return-exchange-form-actions button {
+    width: 100%;
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import {
   User,
@@ -15,6 +15,7 @@ import {
   Check,
   Mail,
   X,
+  Wallet,
 } from "lucide-react";
 
 import NotificationModal from "../components/common/NotificationModal";
@@ -36,10 +37,34 @@ import {
   setDefaultAddress,
 } from "../api/services/userService";
 
+import {
+  getMyOrders,
+  requestReturnExchange,
+  cancelOrder,
+} from "../api/services/userOrderService";
+
 import "./UserProfile.css";
+
+const isReturnExchangeAvailable = (order, type) => {
+  if (!order?.deliveredAt || order.orderStatus !== "Delivered") {
+    return false;
+  }
+
+  const allowedDays = type === "Return" ? 7 : 10;
+
+  const deliveryDate = new Date(order.deliveredAt);
+  deliveryDate.setHours(0, 0, 0, 0);
+
+  const deadline = new Date(deliveryDate);
+  deadline.setDate(deadline.getDate() + allowedDays);
+  deadline.setHours(23, 59, 59, 999);
+
+  return new Date() <= deadline;
+};
 
 function UserProfile() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ================= USER =================
 
@@ -52,6 +77,27 @@ function UserProfile() {
   const [showAddresses, setShowAddresses] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
+
+  // ================= ORDERS =================
+
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [showOrders, setShowOrders] = useState(false);
+
+  // ================= RETURN / EXCHANGE =================
+
+  const [returnExchangeForm, setReturnExchangeForm] = useState(null);
+  const [returnExchangeReason, setReturnExchangeReason] = useState("");
+  const [returnExchangeError, setReturnExchangeError] = useState("");
+  const [returnExchangeLoading, setReturnExchangeLoading] = useState(false);
+
+  const [selectedReplacementVariant, setSelectedReplacementVariant] =
+    useState("");
+  const [replacementVariantDetails, setReplacementVariantDetails] =
+    useState(null);
+
+  // ================= ADDRESS FORM =================
 
   const [addressForm, setAddressForm] = useState({
     fullName: "",
@@ -113,17 +159,85 @@ function UserProfile() {
   // ================= FETCH PROFILE =================
 
   useEffect(() => {
-  fetchProfile();
+    fetchProfile();
 
-  if (window.location.hash === "#addresses") {
-    setShowAddresses(true);
-    fetchAddresses();
-  }
-}, []);
+    if (window.location.hash === "#addresses") {
+      setShowAddresses(true);
+      fetchAddresses();
+    }
+  }, []);
+
+  // ================= RESTORE EXCHANGE SELECTION =================
+
+  useEffect(() => {
+    const exchangeReturn = location.state?.exchangeReturn;
+
+    if (!exchangeReturn) {
+      return;
+    }
+
+    setShowAddresses(false);
+    setShowOrders(true);
+    setOrdersError("");
+
+    setReturnExchangeForm({
+      orderId: exchangeReturn.orderId,
+      itemIndex: exchangeReturn.itemIndex,
+      type: "Exchange",
+    });
+
+    setReturnExchangeReason(exchangeReturn.reason || "");
+
+    setSelectedReplacementVariant(
+      exchangeReturn.replacementVariantId || "",
+    );
+
+    setReplacementVariantDetails({
+      color: exchangeReturn.replacementColor || "",
+      size: exchangeReturn.replacementSize ?? "",
+      price: exchangeReturn.replacementPrice,
+    });
+
+    setReturnExchangeError("");
+
+    const loadOrders = async () => {
+      try {
+        setOrdersLoading(true);
+
+        const response = await getMyOrders();
+
+        if (response.success) {
+          setOrders(response.orders || []);
+        } else {
+          setOrdersError(
+            response.message || "Unable to load your orders.",
+          );
+        }
+      } catch (error) {
+        setOrdersError(
+          error.response?.data?.message ||
+            "Unable to load your orders.",
+        );
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+
+    loadOrders();
+
+    navigate("/profile", {
+      replace: true,
+      state: null,
+    });
+  }, [location.state, navigate]);
 
   // ================= NOTIFICATION FUNCTIONS =================
 
-  const showNotificationMessage = (title, message, type = "success") => {
+  const showNotificationMessage = (
+    title,
+    message,
+    type = "success",
+  ) => {
     setNotificationTitle(title);
     setNotificationMessage(message);
     setNotificationType(type);
@@ -164,7 +278,7 @@ function UserProfile() {
     setConfirmationAction(null);
   };
 
-  // ..............GET USER PROFILE ...................//
+  // ================= GET USER PROFILE =================
 
   const fetchProfile = async () => {
     try {
@@ -195,7 +309,7 @@ function UserProfile() {
     }
   };
 
-  //...................... EDIT PROFILE.............//
+  // ================= EDIT PROFILE =================
 
   const openEditProfile = () => {
     setEditName(user.name || "");
@@ -251,7 +365,7 @@ function UserProfile() {
     }
   };
 
-  //........... CHANGE PROFILE PHOTO...............//
+  // ================= CHANGE PROFILE PHOTO =================
 
   const openImageSelector = () => {
     const imageInput = document.getElementById("profile-image-input");
@@ -268,7 +382,6 @@ function UserProfile() {
       return;
     }
 
-    // Only allow image files
     if (!file.type.startsWith("image/")) {
       showNotificationMessage(
         "Invalid Image",
@@ -280,7 +393,6 @@ function UserProfile() {
       return;
     }
 
-    // Maximum image size: 2 MB
     if (file.size > 2 * 1024 * 1024) {
       showNotificationMessage(
         "Image Too Large",
@@ -304,7 +416,7 @@ function UserProfile() {
     reader.readAsDataURL(file);
   };
 
-  // .............SAVE PROFILE PHOTO .............
+  // ================= SAVE PROFILE PHOTO =================
 
   const handleSaveProfileImage = async () => {
     if (!selectedImage || !imagePreview) {
@@ -376,7 +488,7 @@ function UserProfile() {
     }
   };
 
-  // ............. REMOVE PROFILE PHOTO ...............
+  // ================= REMOVE PROFILE PHOTO =================
 
   const handleRemoveProfileImage = () => {
     showConfirmationMessage(
@@ -425,7 +537,7 @@ function UserProfile() {
     }
   };
 
-  //..................... CHANGE EMAIL...............//
+  // ================= CHANGE EMAIL =================
 
   const openChangeEmail = () => {
     setNewEmail("");
@@ -433,6 +545,7 @@ function UserProfile() {
     setEmailOtpSent(false);
     setShowChangeEmail(true);
   };
+
   const handleSendEmailOtp = async (e) => {
     e.preventDefault();
 
@@ -557,7 +670,8 @@ function UserProfile() {
     setEmailOtpSent(false);
   };
 
-  //...............change password.............//
+  // ================= CHANGE PASSWORD =================
+
   const openChangePassword = () => {
     setCurrentPassword("");
     setNewPassword("");
@@ -566,6 +680,7 @@ function UserProfile() {
     setPasswordOtpSent(false);
     setShowChangePassword(true);
   };
+
   const handleSendPasswordOtp = async (e) => {
     e.preventDefault();
 
@@ -690,7 +805,7 @@ function UserProfile() {
     setPasswordOtpSent(false);
   };
 
-  //.................... GET ADDRESS ...............//
+  // ================= GET ADDRESSES =================
 
   const fetchAddresses = async () => {
     try {
@@ -722,8 +837,46 @@ function UserProfile() {
   // ================= OPEN ADDRESSES =================
 
   const handleAddresses = () => {
+    setShowOrders(false);
     setShowAddresses(true);
     fetchAddresses();
+  };
+
+  // ================= OPEN PROFILE =================
+
+  const handleProfile = () => {
+    setShowOrders(false);
+    setShowAddresses(false);
+  };
+
+  // ================= OPEN ORDERS =================
+
+  const handleOrders = async () => {
+    setShowAddresses(false);
+    setShowOrders(true);
+    setOrdersError("");
+
+    try {
+      setOrdersLoading(true);
+
+      const response = await getMyOrders();
+
+      if (!response.success) {
+        throw new Error(
+          response.message || "Unable to load orders.",
+        );
+      }
+
+      setOrders(response.orders || []);
+    } catch (error) {
+      setOrdersError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to load your orders.",
+      );
+    } finally {
+      setOrdersLoading(false);
+    }
   };
 
   // ================= ADDRESS INPUT =================
@@ -873,7 +1026,7 @@ function UserProfile() {
     );
   };
 
-  // ================= SET DEFAULT =================
+  // ================= SET DEFAULT ADDRESS =================
 
   const handleSetDefault = async (addressId) => {
     try {
@@ -906,7 +1059,7 @@ function UserProfile() {
     }
   };
 
-  // .................LOGOUT ............
+  // ================= LOGOUT =================
 
   const logoutUser = () => {
     localStorage.removeItem("userToken");
@@ -921,6 +1074,130 @@ function UserProfile() {
       "Are you sure you want to logout?",
       logoutUser,
       "Logout",
+    );
+  };
+
+  // ================= RETURN AND EXCHANGE =================
+
+  const handleReturnExchangeClick = (orderId, itemIndex, type) => {
+    setReturnExchangeForm({
+      orderId,
+      itemIndex,
+      type,
+    });
+
+    setReturnExchangeReason("");
+    setReturnExchangeError("");
+    setSelectedReplacementVariant("");
+    setReplacementVariantDetails(null);
+  };
+
+  const handleReturnExchangeSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!returnExchangeReason.trim()) {
+      setReturnExchangeError("Please enter a reason.");
+      return;
+    }
+
+    if (
+      returnExchangeForm.type === "Exchange" &&
+      !selectedReplacementVariant
+    ) {
+      setReturnExchangeError(
+        "Please choose a replacement color and size first.",
+      );
+      return;
+    }
+
+    try {
+      setReturnExchangeLoading(true);
+      setReturnExchangeError("");
+
+      const response = await requestReturnExchange(
+        returnExchangeForm.orderId,
+        returnExchangeForm.itemIndex,
+        returnExchangeForm.type,
+        returnExchangeReason.trim(),
+        returnExchangeForm.type === "Exchange"
+          ? selectedReplacementVariant
+          : null,
+      );
+
+      if (!response.success) {
+        throw new Error(
+          response.message || "Unable to submit your request.",
+        );
+      }
+
+      const updatedOrders = await getMyOrders();
+
+      if (updatedOrders.success) {
+        setOrders(updatedOrders.orders || []);
+      }
+
+      const submittedType = returnExchangeForm.type;
+
+      setReturnExchangeForm(null);
+      setReturnExchangeReason("");
+      setSelectedReplacementVariant("");
+      setReplacementVariantDetails(null);
+      setReturnExchangeError("");
+
+      showNotificationMessage(
+        "Request Submitted",
+        response.message ||
+          `${submittedType} request submitted successfully.`,
+        "success",
+      );
+    } catch (error) {
+      setReturnExchangeError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to submit your request.",
+      );
+    } finally {
+      setReturnExchangeLoading(false);
+    }
+  };
+
+  // ================= CANCEL ORDER =================
+
+  const handleCancelOrder = (orderId) => {
+    showConfirmationMessage(
+      "Cancel Order",
+      "Are you sure you want to cancel this order?",
+      async () => {
+        try {
+          const response = await cancelOrder(orderId);
+
+          if (!response.success) {
+            throw new Error(
+              response.message || "Unable to cancel order.",
+            );
+          }
+
+          const updatedOrders = await getMyOrders();
+
+          if (updatedOrders.success) {
+            setOrders(updatedOrders.orders || []);
+          }
+
+          showNotificationMessage(
+            "Order Cancelled",
+            "Your order has been cancelled successfully.",
+          );
+        } catch (error) {
+          showNotificationMessage(
+            "Cancellation Failed",
+            error.response?.data?.message ||
+              error.message ||
+              "Unable to cancel order.",
+            "error",
+          );
+        }
+      },
+      "Yes, Cancel Order",
     );
   };
 
@@ -942,42 +1219,69 @@ function UserProfile() {
         <h2>My Account</h2>
 
         <button
-          className={`sidebar-item ${!showAddresses ? "active" : ""}`}
-          onClick={() => setShowAddresses(false)}
+          className={`sidebar-item ${
+            !showAddresses && !showOrders ? "active" : ""
+          }`}
+          onClick={handleProfile}
         >
           <User size={18} />
           <span>Profile</span>
         </button>
 
-        <button className="sidebar-item">
+        <button
+          className={`sidebar-item ${showOrders ? "active" : ""}`}
+          onClick={handleOrders}
+        >
           <Package size={18} />
           <span>My Orders</span>
         </button>
 
-        <button className="sidebar-item" onClick={() => navigate("/wishlist")}>
+        <button
+          className="sidebar-item"
+          onClick={() => navigate("/wishlist")}
+        >
           <Heart size={18} />
           <span>Wishlist</span>
         </button>
 
         <button
-          className={`sidebar-item ${showAddresses ? "active" : ""}`}
+          className={`sidebar-item ${
+            showAddresses && !showOrders ? "active" : ""
+          }`}
           onClick={handleAddresses}
         >
           <MapPin size={18} />
           <span>Addresses</span>
         </button>
 
-        <button className="sidebar-item" onClick={openChangePassword}>
+        <button
+          className="sidebar-item"
+          onClick={() => navigate("/wallet")}
+        >
+          <Wallet size={18} />
+          <span>My Wallet</span>
+        </button>
+
+        <button
+          className="sidebar-item"
+          onClick={openChangePassword}
+        >
           <Lock size={18} />
           <span>Change Password</span>
         </button>
 
-        <button className="sidebar-item" onClick={openChangeEmail}>
+        <button
+          className="sidebar-item"
+          onClick={openChangeEmail}
+        >
           <Mail size={18} />
           <span>Change Email</span>
         </button>
 
-        <button className="sidebar-item logout" onClick={handleLogout}>
+        <button
+          className="sidebar-item logout"
+          onClick={handleLogout}
+        >
           <LogOut size={18} />
           <span>Logout</span>
         </button>
@@ -986,11 +1290,331 @@ function UserProfile() {
       {/* ================= MAIN CONTENT ================= */}
 
       <main className="profile-content">
-        {!showAddresses ? (
+        {showOrders ? (
+          <>
+            <h1>My Orders</h1>
+
+            <p className="profile-subtitle">
+              View your orders and track their delivery status.
+            </p>
+
+            {ordersLoading ? (
+              <p>Loading your orders...</p>
+            ) : ordersError ? (
+              <p>{ordersError}</p>
+            ) : orders.length === 0 ? (
+              <div className="profile-card">
+                <Package size={40} />
+                <h3>No orders yet</h3>
+                <p>Your placed orders will appear here.</p>
+
+                <button
+                  className="edit-profile-btn"
+                  onClick={() => navigate("/products")}
+                >
+                  Start Shopping
+                </button>
+              </div>
+            ) : (
+              <div className="my-orders-list">
+                {orders.map((order) => (
+                  <div
+                    className="profile-card my-order-card"
+                    key={order._id}
+                  >
+                    <div className="my-order-header">
+                      <div>
+                        <h3>Order #{order.orderNumber}</h3>
+                        <p>
+                          {new Date(order.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+
+                      <span className="my-order-status">
+                        {order.orderStatus}
+                      </span>
+                    </div>
+
+                    <div className="my-order-items">
+                      {order.items.map((item, index) => (
+                        <div
+                          className="my-order-item-details"
+                          key={`${order._id}-${index}`}
+                        >
+                          <strong>{item.productName}</strong>
+
+                          <p>
+                            Color: {item.color || "N/A"} | Size:{" "}
+                            {item.size || "N/A"}
+                          </p>
+
+                          <p>Quantity: {item.quantity}</p>
+
+                          {item.returnExchange?.status &&
+                          item.returnExchange.status !== "Not Requested" ? (
+                            <p className="return-exchange-status">
+                              {item.returnExchange.type} Status:{" "}
+                              {item.returnExchange.status}
+                            </p>
+                          ) : order.orderStatus === "Delivered" ? (
+                            <div>
+                              <div className="return-exchange-actions">
+                                {isReturnExchangeAvailable(
+                                  order,
+                                  "Return",
+                                ) && (
+                                  <button
+                                    type="button"
+                                    className="edit-profile-btn"
+                                    onClick={() =>
+                                      handleReturnExchangeClick(
+                                        order._id,
+                                        index,
+                                        "Return",
+                                      )
+                                    }
+                                  >
+                                    Return
+                                  </button>
+                                )}
+
+                                {isReturnExchangeAvailable(
+                                  order,
+                                  "Exchange",
+                                ) && (
+                                  <button
+                                    type="button"
+                                    className="edit-profile-btn"
+                                    onClick={() =>
+                                      handleReturnExchangeClick(
+                                        order._id,
+                                        index,
+                                        "Exchange",
+                                      )
+                                    }
+                                  >
+                                    Exchange
+                                  </button>
+                                )}
+                              </div>
+
+                              {order.deliveredAt &&
+                                !isReturnExchangeAvailable(
+                                  order,
+                                  "Return",
+                                ) &&
+                                !isReturnExchangeAvailable(
+                                  order,
+                                  "Exchange",
+                                ) && (
+                                  <p className="return-exchange-status">
+                                    Return and exchange period has expired.
+                                  </p>
+                                )}
+                            </div>
+                          ) : null}
+
+                          {returnExchangeForm?.orderId === order._id &&
+                            returnExchangeForm?.itemIndex === index && (
+                                                            <form
+                                className="return-exchange-form"
+                                onSubmit={handleReturnExchangeSubmit}
+                              >
+                                <h4>
+                                  {returnExchangeForm.type === "Return"
+                                    ? "Return this product"
+                                    : "Exchange this product"}
+                                </h4>
+
+                                {returnExchangeForm.type === "Return" ? (
+                                  <p className="return-exchange-description">
+                                    You can return this product and place a
+                                    new order for the item you want instead.
+                                    Please tell us why you would like to
+                                    return it.
+                                  </p>
+                                ) : (
+                                  <p className="return-exchange-description">
+                                    Choose a different color or size for this
+                                    product. Your replacement must have the
+                                    same eligible price as your original
+                                    purchase.
+                                  </p>
+                                )}
+
+                                {returnExchangeForm.type === "Exchange" && (
+                                  <div className="replacement-variant-field">
+                                    {replacementVariantDetails ? (
+                                      <div className="selected-replacement">
+                                        <p>
+                                          <strong>Your replacement</strong>
+                                        </p>
+
+                                        <p>
+                                          Color:{" "}
+                                          {replacementVariantDetails.color ||
+                                            "N/A"}
+                                        </p>
+
+                                        <p>
+                                          Size:{" "}
+                                          {replacementVariantDetails.size ||
+                                            "N/A"}
+                                        </p>
+
+                                        <p>
+                                          Price: ₹
+                                          {Number(
+                                            replacementVariantDetails.price,
+                                          ).toLocaleString("en-IN")}
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <p className="replacement-selection-hint">
+                                        No replacement selected yet.
+                                      </p>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      className="edit-profile-btn"
+                                      onClick={() =>
+                                        navigate(
+                                          `/products/${item.productId}`,
+                                          {
+                                            state: {
+                                              exchangeContext: {
+                                                orderId: order._id,
+                                                itemIndex: index,
+                                                originalVariantId:
+                                                  item.variantId,
+                                                originalPrice: item.price,
+                                                originalColor: item.color,
+                                                productId: item.productId,
+                                                reason: returnExchangeReason,
+                                              },
+                                            },
+                                          },
+                                        )
+                                      }
+                                    >
+                                      {replacementVariantDetails
+                                        ? "Change Replacement"
+                                        : "Choose Replacement"}
+                                    </button>
+                                  </div>
+                                )}
+
+                                <label className="return-exchange-reason-label">
+                                  Reason for{" "}
+                                  {returnExchangeForm.type.toLowerCase()}
+                                </label>
+
+                                <textarea
+                                  value={returnExchangeReason}
+                                  onChange={(event) => {
+                                    setReturnExchangeReason(
+                                      event.target.value,
+                                    );
+                                    setReturnExchangeError("");
+                                  }}
+                                  placeholder={
+                                    returnExchangeForm.type === "Return"
+                                      ? "Why would you like to return this product?"
+                                      : "Why would you like to exchange this product?"
+                                  }
+                                  rows={3}
+                                  required
+                                />
+
+                                {returnExchangeError && (
+                                  <p
+                                    className="return-exchange-error"
+                                    role="alert"
+                                  >
+                                    {returnExchangeError}
+                                  </p>
+                                )}
+
+                                <div className="return-exchange-form-actions">
+                                  <button
+                                    type="submit"
+                                    className="edit-profile-btn"
+                                    disabled={
+                                      returnExchangeLoading ||
+                                      (returnExchangeForm.type === "Exchange" &&
+                                        !selectedReplacementVariant)
+                                    }
+                                  >
+                                    {returnExchangeLoading
+                                      ? "Submitting..."
+                                      : returnExchangeForm.type === "Return"
+                                        ? "Submit Return Request"
+                                        : "Submit Exchange Request"}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="edit-profile-btn return-exchange-cancel-btn"
+                                    onClick={() => {
+                                      setReturnExchangeForm(null);
+                                      setReturnExchangeReason("");
+                                      setReturnExchangeError("");
+                                      setSelectedReplacementVariant("");
+                                      setReplacementVariantDetails(null);
+                                    }}
+                                    disabled={returnExchangeLoading}
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </form>
+                            )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="my-order-footer">
+                      <p>
+                        Total:{" "}
+                        <strong>
+                          ₹{Number(order.totalAmount).toFixed(2)}
+                        </strong>
+                      </p>
+
+                      <button
+                        className="edit-profile-btn"
+                        onClick={() =>
+                          navigate(`/orders/${order._id}/track`)
+                        }
+                      >
+                        Track Order
+                      </button>
+
+                      {["Placed", "Confirmed"].includes(
+                        order.orderStatus,
+                      ) && (
+                        <button
+                          type="button"
+                          className="edit-profile-btn"
+                          onClick={() => handleCancelOrder(order._id)}
+                        >
+                          Cancel Order
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : !showAddresses ? (
           <>
             <h1>My Profile</h1>
 
-            <p className="profile-subtitle">Manage your personal information</p>
+            <p className="profile-subtitle">
+              Manage your personal information
+            </p>
 
             <div className="profile-card">
               {/* ================= PROFILE IMAGE ================= */}
@@ -998,13 +1622,14 @@ function UserProfile() {
               <div className="profile-image-section">
                 <div className="profile-image">
                   {user.profileImage && user.profileImage.length > 0 ? (
-                    <img src={user.profileImage[0]} alt="Profile" />
+                    <img
+                      src={user.profileImage[0]}
+                      alt="Profile"
+                    />
                   ) : (
                     <User size={55} />
                   )}
                 </div>
-
-                {/* Hidden file input */}
 
                 <input
                   id="profile-image-input"
@@ -1014,8 +1639,6 @@ function UserProfile() {
                   style={{ display: "none" }}
                 />
 
-                {/* Change Photo */}
-
                 <button
                   type="button"
                   className="change-image"
@@ -1024,8 +1647,6 @@ function UserProfile() {
                   <Camera size={15} />
                   Change Photo
                 </button>
-
-                {/* Remove Photo */}
 
                 {user.profileImage && user.profileImage.length > 0 && (
                   <button
@@ -1051,7 +1672,10 @@ function UserProfile() {
                   <p>{user.email}</p>
                 </div>
 
-                <button className="edit-profile-btn" onClick={openEditProfile}>
+                <button
+                  className="edit-profile-btn"
+                  onClick={openEditProfile}
+                >
                   Edit Profile
                 </button>
               </div>
@@ -1065,10 +1689,15 @@ function UserProfile() {
               <div>
                 <h1>My Addresses</h1>
 
-                <p className="profile-subtitle">Manage your saved addresses</p>
+                <p className="profile-subtitle">
+                  Manage your saved addresses
+                </p>
               </div>
 
-              <button className="add-address-btn" onClick={handleAddAddress}>
+              <button
+                className="add-address-btn"
+                onClick={handleAddAddress}
+              >
                 <Plus size={18} />
                 Add Address
               </button>
@@ -1078,7 +1707,9 @@ function UserProfile() {
 
             {showAddressForm && (
               <div className="address-form-card">
-                <h2>{editingAddressId ? "Edit Address" : "Add New Address"}</h2>
+                <h2>
+                  {editingAddressId ? "Edit Address" : "Add New Address"}
+                </h2>
 
                 <form onSubmit={handleAddressSubmit}>
                   <div className="address-form-grid">
@@ -1204,7 +1835,9 @@ function UserProfile() {
                         <h3>{address.addressType}</h3>
 
                         {address.isDefault && (
-                          <span className="default-badge">Default</span>
+                          <span className="default-badge">
+                            Default
+                          </span>
                         )}
                       </div>
                     </div>
@@ -1222,18 +1855,24 @@ function UserProfile() {
                     </p>
 
                     <div className="address-actions">
-                      <button onClick={() => handleEditAddress(address)}>
+                      <button
+                        onClick={() => handleEditAddress(address)}
+                      >
                         <Pencil size={14} />
                         Edit
                       </button>
 
-                      <button onClick={() => handleDeleteAddress(address._id)}>
+                      <button
+                        onClick={() => handleDeleteAddress(address._id)}
+                      >
                         <Trash2 size={14} />
                         Delete
                       </button>
 
                       {!address.isDefault && (
-                        <button onClick={() => handleSetDefault(address._id)}>
+                        <button
+                          onClick={() => handleSetDefault(address._id)}
+                        >
                           <Check size={14} />
                           Set Default
                         </button>
@@ -1247,9 +1886,7 @@ function UserProfile() {
         )}
       </main>
 
-      {/* =====================================================
-          EDIT PROFILE MODAL
-      ===================================================== */}
+      {/* ================= EDIT PROFILE MODAL ================= */}
 
       {showEditProfile && (
         <div className="profile-modal-overlay">
@@ -1297,9 +1934,7 @@ function UserProfile() {
         </div>
       )}
 
-      {/* =====================================================
-          CHANGE PROFILE PHOTO MODAL
-      ===================================================== */}
+      {/* ================= CHANGE PROFILE PHOTO MODAL ================= */}
 
       {showImageModal && (
         <div className="profile-modal-overlay">
@@ -1353,9 +1988,7 @@ function UserProfile() {
         </div>
       )}
 
-      {/* =====================================================
-          CHANGE EMAIL MODAL
-      ===================================================== */}
+      {/* ================= CHANGE EMAIL MODAL ================= */}
 
       {showChangeEmail && (
         <div className="profile-modal-overlay">
@@ -1449,7 +2082,7 @@ function UserProfile() {
         </div>
       )}
 
-      {/* CHANGE PASSWORD MODAL */}
+      {/* ================= CHANGE PASSWORD MODAL ================= */}
 
       {showChangePassword && (
         <div className="profile-modal-overlay">
@@ -1544,7 +2177,9 @@ function UserProfile() {
 
                 <div className="profile-modal-buttons">
                   <button type="submit" disabled={formLoading}>
-                    {formLoading ? "Verifying..." : "Verify & Change Password"}
+                    {formLoading
+                      ? "Verifying..."
+                      : "Verify & Change Password"}
                   </button>
 
                   <button

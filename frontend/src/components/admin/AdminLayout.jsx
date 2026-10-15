@@ -22,8 +22,6 @@ function AdminLayout({ children, title }) {
         </div>
 
         <nav className="admin-menu">
-          <p className="menu-title">MAIN</p>
-
           <button
             onClick={() => navigate("/admin/dashboard")}
             className="menu-item"
@@ -49,8 +47,9 @@ function AdminLayout({ children, title }) {
           </button>
 
           <button
-          onClick={() => navigate("/admin/orders")}  
-          className="menu-item">
+            onClick={() => navigate("/admin/orders")}
+            className="menu-item"
+          >
             <span>▤</span>
             Orders
           </button>
@@ -63,12 +62,18 @@ function AdminLayout({ children, title }) {
             Categories
           </button>
 
-          <button className="menu-item">
+          <button
+            onClick={() => navigate("/admin/offers")}
+            className="menu-item"
+          >
             <span>◇</span>
             Offers
           </button>
 
-          <button className="menu-item">
+          <button
+            onClick={() => navigate("/admin/coupons")}
+            className="menu-item"
+          >
             <span>♢</span>
             Coupons
           </button>
@@ -78,7 +83,7 @@ function AdminLayout({ children, title }) {
             Banners
           </button>
 
-          <p className="menu-title">REPORTS</p>
+         
 
           <button className="menu-item">
             <span>▥</span>
@@ -90,9 +95,12 @@ function AdminLayout({ children, title }) {
             Reviews
           </button>
 
-          <button className="menu-item">
+          <button
+            onClick={() => navigate("/admin/returns")}
+            className="menu-item"
+          >
             <span>↩</span>
-            Returns
+            Return&Exchange
           </button>
         </nav>
 

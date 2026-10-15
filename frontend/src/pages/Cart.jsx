@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,9 +16,7 @@ import {
   addToCart,
 } from "../api/services/userCartService";
 
-import {
-  addToWishlist,
-} from "../api/services/userWishlistService";
+import { addToWishlist } from "../api/services/userWishlistService";
 
 import NotificationModal from "../components/common/NotificationModal";
 import "./Cart.css";
@@ -63,14 +60,14 @@ function Cart() {
         showNotification(
           "Cart Error",
           result.message || "Unable to load your cart.",
-          "error"
+          "error",
         );
       }
     } catch (err) {
       showNotification(
         "Cart Error",
         err.response?.data?.message || "Unable to load your cart.",
-        "error"
+        "error",
       );
     } finally {
       setLoading(false);
@@ -96,17 +93,17 @@ function Cart() {
       }
 
       return groups;
-    }, {})
+    }, {}),
   );
 
   const totalItems = groupedItems.reduce(
     (total, item) => total + item.quantity,
-    0
+    0,
   );
 
   const totalPrice = groupedItems.reduce(
     (total, item) => total + Number(item.price || 0) * item.quantity,
-    0
+    0,
   );
 
   const changeQuantity = async (item, quantity) => {
@@ -116,7 +113,7 @@ function Cart() {
       showNotification(
         "Cart Update",
         "This variant has duplicate cart entries. Please remove it and add it again.",
-        "info"
+        "info",
       );
       return;
     }
@@ -128,22 +125,19 @@ function Cart() {
 
       if (result.success) {
         setItems(result.cart?.items || []);
-        showNotification(
-          "Cart Updated",
-          "Quantity updated successfully."
-        );
+        showNotification("Cart Updated", "Quantity updated successfully.");
       } else {
         showNotification(
           "Update Failed",
           result.message || "Unable to update quantity.",
-          "error"
+          "error",
         );
       }
     } catch (err) {
       showNotification(
         "Update Failed",
         err.response?.data?.message || "Unable to update quantity.",
-        "error"
+        "error",
       );
     } finally {
       setUpdatingItem("");
@@ -158,9 +152,7 @@ function Cart() {
         const result = await removeCartItem(itemId);
 
         if (!result.success) {
-          throw new Error(
-            result.message || "Unable to remove item from cart."
-          );
+          throw new Error(result.message || "Unable to remove item from cart.");
         }
       }
 
@@ -169,7 +161,7 @@ function Cart() {
 
       showNotification(
         "Item Removed",
-        "Product removed from your cart successfully."
+        "Product removed from your cart successfully.",
       );
     } catch (err) {
       await fetchCart();
@@ -179,7 +171,7 @@ function Cart() {
         err.response?.data?.message ||
           err.message ||
           "Unable to remove item from cart.",
-        "error"
+        "error",
       );
     } finally {
       setUpdatingItem("");
@@ -195,14 +187,11 @@ function Cart() {
       }
 
       // Save to wishlist first. Do not remove from cart before this succeeds.
-      const wishlistResult = await addToWishlist(
-        item.variantId,
-        item.quantity
-      );
+      const wishlistResult = await addToWishlist(item.variantId, item.quantity);
 
       if (!wishlistResult.success) {
         throw new Error(
-          wishlistResult.message || "Could not add item to wishlist."
+          wishlistResult.message || "Could not add item to wishlist.",
         );
       }
 
@@ -216,7 +205,7 @@ function Cart() {
           showNotification(
             "Partially Completed",
             "Item was saved to your wishlist, but could not be fully removed from your cart.",
-            "error"
+            "error",
           );
           return;
         }
@@ -227,7 +216,7 @@ function Cart() {
 
       showNotification(
         "Moved to Wishlist",
-        "Product saved to your wishlist successfully."
+        "Product saved to your wishlist successfully.",
       );
     } catch (err) {
       showNotification(
@@ -235,7 +224,7 @@ function Cart() {
         err.response?.data?.message ||
           err.message ||
           "Could not move product to wishlist.",
-        "error"
+        "error",
       );
     } finally {
       setUpdatingItem("");
@@ -278,17 +267,11 @@ function Cart() {
           <h2>Your cart is empty</h2>
           <p>Discover your favourite footwear at SOLESTYLE.</p>
 
-          <button
-            type="button"
-            onClick={() => navigate("/products")}
-          >
+          <button type="button" onClick={() => navigate("/products")}>
             Shop Now
           </button>
 
-          <button
-            type="button"
-            onClick={() => navigate("/wishlist")}
-          >
+          <button type="button" onClick={() => navigate("/wishlist")}>
             View Wishlist
           </button>
         </div>
@@ -308,21 +291,51 @@ function Cart() {
                   <p>Color: {item.color}</p>
                   <p>Size: {item.size}</p>
 
-                  <p className="cart-item-price">
-                    ₹{Number(item.price || 0).toLocaleString("en-IN")}
-                  </p>
+                  <div className="cart-item-price">
+                    {Number(item.offerDiscount || 0) > 0 && (
+                      <span
+                        style={{
+                          textDecoration: "line-through",
+                          color: "#888",
+                          marginRight: "8px",
+                          fontWeight: "normal",
+                        }}
+                      >
+                        ₹
+                        {Number(item.originalPrice || 0).toLocaleString(
+                          "en-IN",
+                        )}
+                      </span>
+                    )}
 
+                    <strong>
+                      ₹{Number(item.price || 0).toLocaleString("en-IN")}
+                    </strong>
+
+                    {Number(item.offerDiscount || 0) > 0 && (
+                      <span
+                        style={{
+                          display: "block",
+                          color: "#c2185b",
+                          fontSize: "13px",
+                          marginTop: "4px",
+                        }}
+                      >
+                        Offer savings: ₹
+                        {Number(item.offerDiscount || 0).toLocaleString(
+                          "en-IN",
+                        )}
+                      </span>
+                    )}
+                  </div>
                   <div className="cart-quantity">
                     <button
                       type="button"
                       aria-label="Decrease quantity"
                       disabled={
-                        updatingItem === item.variantId ||
-                        item.quantity <= 1
+                        updatingItem === item.variantId || item.quantity <= 1
                       }
-                      onClick={() =>
-                        changeQuantity(item, item.quantity - 1)
-                      }
+                      onClick={() => changeQuantity(item, item.quantity - 1)}
                     >
                       <Minus size={16} />
                     </button>
@@ -336,9 +349,7 @@ function Cart() {
                         updatingItem === item.variantId ||
                         item.quantity >= item.stock
                       }
-                      onClick={() =>
-                        changeQuantity(item, item.quantity + 1)
-                      }
+                      onClick={() => changeQuantity(item, item.quantity + 1)}
                     >
                       <Plus size={16} />
                     </button>
@@ -370,7 +381,7 @@ function Cart() {
                 <p className="cart-item-subtotal">
                   ₹
                   {Number(
-                    Number(item.price || 0) * item.quantity
+                    Number(item.price || 0) * item.quantity,
                   ).toLocaleString("en-IN")}
                 </p>
               </div>

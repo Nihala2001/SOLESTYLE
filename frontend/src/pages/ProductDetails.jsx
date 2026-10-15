@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Heart, ArrowLeft } from "lucide-react";
 
 import { getActiveProducts } from "../api/services/userProductService";
@@ -13,12 +13,15 @@ import {
 } from "../api/services/userWishlistService";
 
 import NotificationModal from "../components/common/NotificationModal";
-
 import "./ProductDetails.css";
 
 function ProductDetails() {
   const { productId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const exchangeContext = location.state?.exchangeContext;
+  const isExchangeMode = Boolean(exchangeContext);
 
   const [product, setProduct] = useState(null);
   const [variants, setVariants] = useState([]);
@@ -27,16 +30,14 @@ function ProductDetails() {
   const [selectedSize, setSelectedSize] = useState(null);
 
   const [loading, setLoading] = useState(true);
-
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
 
-  const [cartMessage, setCartMessage] = useState("");
   const [addingToCart, setAddingToCart] = useState(false);
-
   const [isWishlisted, setIsWishlisted] = useState(false);
-
   const [wishlistBusy, setWishlistBusy] = useState(false);
+
+  const [exchangeError, setExchangeError] = useState("");
 
   const [notification, setNotification] = useState({
     isOpen: false,
@@ -44,6 +45,8 @@ function ProductDetails() {
     message: "",
     type: "success",
   });
+
+  // ================= NOTIFICATION =================
 
   const showNotification = (title, message, type = "success") => {
     setNotification({
@@ -68,21 +71,21 @@ function ProductDetails() {
       try {
         setLoading(true);
 
-        // Declare foundProduct outside the if block
-        let foundProduct = null;
+        const productData = await getActiveProducts({ limit: 100 });
 
-        const productData = await getActiveProducts({
-          limit: 100,
-        });
+        let foundProduct = null;
 
         if (productData.success) {
           foundProduct =
-            productData.products.find((item) => item._id === productId) || null;
+            productData.products.find(
+              (item) => String(item._id) === String(productId),
+            ) || null;
 
           setProduct(foundProduct);
+        } else {
+          setProduct(null);
         }
 
-        // Fetch product variants
         const variantData = await getProductVariants(productId);
 
         if (variantData.success) {
@@ -91,8 +94,9 @@ function ProductDetails() {
           setVariants(fetchedVariants);
 
           if (fetchedVariants.length > 0) {
-            // Use the color saved by the admin
-            const preferredColor = foundProduct?.displayColor;
+            const preferredColor = isExchangeMode
+              ? exchangeContext.originalColor
+              : foundProduct?.displayColor;
 
             const matchingColor = fetchedVariants.find(
               (variant) =>
@@ -100,7 +104,6 @@ function ProductDetails() {
                 preferredColor?.trim().toLowerCase(),
             );
 
-            // Fall back to the first variant if no saved color matches
             setSelectedColor(
               matchingColor?.color || fetchedVariants[0].color || "",
             );
@@ -111,17 +114,23 @@ function ProductDetails() {
           setSelectedSize(null);
           setSelectedImageIndex(0);
           setIsZoomed(false);
+          setExchangeError("");
+        } else {
+          setVariants([]);
+          setSelectedColor("");
+          setSelectedSize(null);
         }
       } catch (error) {
         console.error("Failed to fetch product details:", error);
         setProduct(null);
+        setVariants([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchProduct();
-  }, [productId]);
+  }, [productId, isExchangeMode, exchangeContext?.originalColor]);
 
   // ================= COLORS =================
 
@@ -129,7 +138,7 @@ function ProductDetails() {
     ...new Set(variants.map((variant) => variant.color).filter(Boolean)),
   ];
 
-  // ================= SIZES =================
+  // ================= SIZES FOR SELECTED COLOR =================
 
   const availableSizes = variants.filter(
     (variant) =>
@@ -146,6 +155,11 @@ function ProductDetails() {
       String(variant.size) === String(selectedSize),
   );
 
+  const pricingVariant =
+    selectedVariant ||
+    availableSizes.find((variant) => Number(variant.stock) > 0) ||
+    availableSizes[0];
+
   // ================= SELECTED COLOR IMAGES =================
 
   const selectedColorVariants = variants.filter(
@@ -154,8 +168,6 @@ function ProductDetails() {
       selectedColor.trim().toLowerCase(),
   );
 
-  // Prefer a variant that has a valid main image.
-  // Otherwise, use another variant of the same color with images.
   const selectedColorVariant =
     selectedColorVariants.find(
       (variant) =>
@@ -176,8 +188,6 @@ function ProductDetails() {
       )
     : [];
 
-  // Use only images belonging to the selected color.
-  // Put its main image first when it belongs to that color.
   const selectedImages = selectedColorVariant
     ? [
         ...(selectedColorVariant.mainImage &&
@@ -200,11 +210,15 @@ function ProductDetails() {
     setSelectedSize(null);
     setSelectedImageIndex(0);
     setIsZoomed(false);
+    setIsWishlisted(false);
+    setExchangeError("");
   };
 
-  //......................addtocart...................//
+  // ================= ADD TO CART =================
 
   const handleAddToCart = async () => {
+    if (isExchangeMode) return;
+
     if (!selectedColor) {
       showNotification(
         "Select a Color",
@@ -223,7 +237,7 @@ function ProductDetails() {
       return;
     }
 
-    if (selectedVariant.stock <= 0) {
+    if (Number(selectedVariant.stock) <= 0) {
       showNotification(
         "Out of Stock",
         "This variant is currently out of stock.",
@@ -263,8 +277,61 @@ function ProductDetails() {
     }
   };
 
-  //.................wishlist............//
+  // ================= CONTINUE EXCHANGE =================
+
+  const handleContinueExchange = () => {
+    setExchangeError("");
+
+    if (!selectedColor || !selectedSize || !selectedVariant) {
+      setExchangeError("Please select a color and size.");
+      return;
+    }
+
+    if (Number(selectedVariant.stock) <= 0) {
+      setExchangeError("This size is out of stock. Choose another size.");
+      return;
+    }
+
+    if (
+      String(selectedVariant._id) === String(exchangeContext.originalVariantId)
+    ) {
+      setExchangeError("Please choose a different size or color.");
+      return;
+    }
+
+    const originalPrice = Number(exchangeContext.originalPrice);
+    const replacementPrice = Number(selectedVariant.price);
+
+    if (
+      !Number.isFinite(originalPrice) ||
+      !Number.isFinite(replacementPrice) ||
+      Math.abs(originalPrice - replacementPrice) > 0.009
+    ) {
+      setExchangeError(
+        "Choose a replacement with the same price as your original item.",
+      );
+      return;
+    }
+
+    navigate("/profile", {
+      state: {
+        exchangeReturn: {
+          ...exchangeContext,
+          type: "Exchange",
+          replacementVariantId: selectedVariant._id,
+          replacementColor: selectedVariant.color,
+          replacementSize: selectedVariant.size,
+          replacementPrice: selectedVariant.price,
+        },
+      },
+    });
+  };
+
+  // ================= WISHLIST =================
+
   const handleWishlistToggle = async () => {
+    if (isExchangeMode) return;
+
     if (!selectedColor) {
       showNotification(
         "Select a Color",
@@ -286,7 +353,6 @@ function ProductDetails() {
     try {
       setWishlistBusy(true);
 
-      // Read the latest wishlist to avoid relying on stale UI state.
       const result = await getWishlist();
 
       if (!result.success) {
@@ -353,8 +419,14 @@ function ProductDetails() {
     return (
       <div className="product-not-found">
         <h2>Product not found</h2>
-
-        <button onClick={() => navigate("/products")}>Back to Shop</button>
+        <button
+          type="button"
+          onClick={() =>
+            isExchangeMode ? navigate("/profile") : navigate("/products")
+          }
+        >
+          {isExchangeMode ? "Back to My Orders" : "Back to Shop"}
+        </button>
       </div>
     );
   }
@@ -362,43 +434,58 @@ function ProductDetails() {
   // ================= PAGE =================
 
   return (
-    <div className="product-details-page">
-      <NotificationModal
-        isOpen={notification.isOpen}
-        onClose={closeNotification}
-        title={notification.title}
-        message={notification.message}
-        type={notification.type}
-        duration={2000}
-      />
-      {/* BACK BUTTON */}
+    <div
+      className={`product-details-page ${
+        isExchangeMode ? "exchange-selection-page" : ""
+      }`}
+    >
+      {!isExchangeMode && (
+        <NotificationModal
+          isOpen={notification.isOpen}
+          onClose={closeNotification}
+          title={notification.title}
+          message={notification.message}
+          type={notification.type}
+          duration={2000}
+        />
+      )}
 
-      <button className="product-back-button" onClick={() => navigate(-1)}>
+      <button
+        type="button"
+        className="product-back-button"
+        onClick={() => (isExchangeMode ? navigate("/profile") : navigate(-1))}
+      >
         <ArrowLeft size={18} />
-        Back to Shop
+        {isExchangeMode ? "Back to My Orders" : "Back to Shop"}
       </button>
 
       <div className="product-details-container">
-        {/* ================= IMAGE SECTION ================= */}
+        {/* PRODUCT IMAGES */}
 
         <div className="product-details-images">
           <div className="product-main-image-container">
-            <button
-              type="button"
-              className={`product-details-wishlist ${isWishlisted ? "active" : ""}`}
-              onClick={handleWishlistToggle}
-              disabled={wishlistBusy}
-              aria-label={
-                isWishlisted ? "Remove from wishlist" : "Add to wishlist"
-              }
-              title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
-            >
-              <Heart
-                size={22}
-                fill={isWishlisted ? "#c47d91" : "none"}
-                color={isWishlisted ? "#c47d91" : "currentColor"}
-              />
-            </button>
+            {!isExchangeMode && (
+              <button
+                type="button"
+                className={`product-details-wishlist ${
+                  isWishlisted ? "active" : ""
+                }`}
+                onClick={handleWishlistToggle}
+                disabled={wishlistBusy}
+                aria-label={
+                  isWishlisted ? "Remove from wishlist" : "Add to wishlist"
+                }
+                title={
+                  isWishlisted ? "Remove from wishlist" : "Add to wishlist"
+                }
+              >
+                <Heart
+                  size={22}
+                  fill={isWishlisted ? "#c47d91" : "none"}
+                  color={isWishlisted ? "#c47d91" : "currentColor"}
+                />
+              </button>
+            )}
 
             {currentImage ? (
               <img
@@ -414,8 +501,6 @@ function ProductDetails() {
               </div>
             )}
           </div>
-
-          {/* IMAGE THUMBNAILS */}
 
           {selectedImages.length > 1 && (
             <div className="product-image-thumbnails">
@@ -442,27 +527,76 @@ function ProductDetails() {
           )}
         </div>
 
-        {/* ================= PRODUCT INFORMATION ================= */}
+        {/* PRODUCT INFORMATION */}
 
         <div className="product-details-info">
+          {isExchangeMode && (
+            <p className="exchange-selection-label">CHOOSE YOUR REPLACEMENT</p>
+          )}
+
           <p className="product-details-category">{product.categoryId?.name}</p>
 
           <h1>{product.name}</h1>
 
-          <p className="product-details-price">
-            ₹{selectedVariant?.price ?? product.basePrice}
-          </p>
+          {/* PRICING */}
+
+          <div className="product-details-pricing">
+            {Number(pricingVariant?.offerDiscount || 0) > 0 ? (
+              <>
+                <div className="product-details-price-row">
+                  <p className="product-details-price product-details-discounted-price">
+                    ₹{Number(pricingVariant.price).toLocaleString("en-IN")}
+                  </p>
+
+                  <p className="product-details-original-price">
+                    ₹
+                    {Number(pricingVariant.originalPrice).toLocaleString(
+                      "en-IN",
+                    )}
+                  </p>
+                </div>
+
+                <span className="product-details-offer-badge">
+                  {pricingVariant.discountType === "Percentage"
+                    ? `${Number(pricingVariant.discountValue)}% OFF`
+                    : `₹${Number(pricingVariant.offerDiscount).toLocaleString("en-IN")} OFF`}
+                </span>
+
+                {!isExchangeMode && (
+                  <>
+                    <p className="product-details-offer-savings">
+                      You save ₹
+                      {Number(pricingVariant.offerDiscount).toLocaleString(
+                        "en-IN",
+                      )}
+                      {selectedVariant ? "" : " per pair"}
+                    </p>
+
+                    {pricingVariant.offerName && (
+                      <p className="product-details-offer-name">
+                        {pricingVariant.offerName}
+                      </p>
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              <p className="product-details-price">
+                ₹
+                {Number(
+                  pricingVariant?.price ?? product.basePrice,
+                ).toLocaleString("en-IN")}
+              </p>
+            )}
+          </div>
 
           <p className="product-details-description">{product.description}</p>
 
-          {/* ================= COLOR ================= */}
+          {/* COLOR SELECTION */}
 
           {colors.length > 0 && (
             <div className="variant-section">
-              <h3>
-                Color
-                {selectedColor && <span> - {selectedColor}</span>}
-              </h3>
+              <h3>Color{selectedColor && <span> — {selectedColor}</span>}</h3>
 
               <div className="color-options">
                 {colors.map((color) => (
@@ -481,7 +615,7 @@ function ProductDetails() {
             </div>
           )}
 
-          {/* ================= SIZE ================= */}
+          {/* SIZE SELECTION */}
 
           {selectedColor && (
             <div className="variant-section">
@@ -496,9 +630,12 @@ function ProductDetails() {
                       String(selectedSize) === String(variant.size)
                         ? "selected"
                         : ""
-                    } ${variant.stock === 0 ? "out-of-stock" : ""}`}
-                    disabled={variant.stock === 0}
-                    onClick={() => setSelectedSize(variant.size)}
+                    } ${Number(variant.stock) <= 0 ? "out-of-stock" : ""}`}
+                    disabled={Number(variant.stock) <= 0}
+                    onClick={() => {
+                      setSelectedSize(variant.size);
+                      setExchangeError("");
+                    }}
                   >
                     {variant.size}
                   </button>
@@ -507,42 +644,53 @@ function ProductDetails() {
             </div>
           )}
 
-          {/* ================= STOCK ================= */}
+          {/* STOCK */}
 
-          {selectedVariant && (
+          {selectedVariant && !isExchangeMode && (
             <p
               className={
-                selectedVariant.stock > 0
+                Number(selectedVariant.stock) > 0
                   ? "product-stock"
                   : "product-stock out"
               }
             >
-              {selectedVariant.stock > 0
+              {Number(selectedVariant.stock) > 0
                 ? `${selectedVariant.stock} items available`
                 : "Out of stock"}
             </p>
           )}
 
-          {/* ================= ADD TO CART ================= */}
+          {/* ONE EXCHANGE ERROR, SHOWN ONLY AFTER CONTINUING */}
 
-          <button
-            type="button"
-            className="add-to-cart-button"
-            disabled={addingToCart}
-            onClick={handleAddToCart}
-          >
-            {addingToCart ? "Adding..." : "Add to Cart"}
-          </button>
-
-          {cartMessage && (
-            <p role="status" aria-live="polite" className="cart-message">
-              {cartMessage}
+          {isExchangeMode && exchangeError && (
+            <p className="exchange-selection-error" role="alert">
+              {exchangeError}
             </p>
+          )}
+
+          {/* MAIN ACTION */}
+
+          {isExchangeMode ? (
+            <button
+              type="button"
+              className="add-to-cart-button exchange-confirm-button"
+              onClick={handleContinueExchange}
+            >
+              Confirm Exchange
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="add-to-cart-button"
+              disabled={addingToCart}
+              onClick={handleAddToCart}
+            >
+              {addingToCart ? "Adding..." : "Add to Cart"}
+            </button>
           )}
         </div>
       </div>
-
-      {/* ================= IMAGE VIEWER ================= */}
+      {/* IMAGE VIEWER */}
 
       {isZoomed && currentImage && (
         <div
