@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import AdminLayout from "../components/admin/AdminLayout";
 import NotificationModal from "../components/common/NotificationModal";
@@ -56,7 +57,12 @@ function AdminReturns() {
   });
 
   const showNotification = (title, message, type = "success") => {
-    setNotification({ show: true, title, message, type });
+    setNotification({
+      show: true,
+      title,
+      message,
+      type,
+    });
   };
 
   const fetchRequests = async () => {
@@ -78,7 +84,7 @@ function AdminReturns() {
         error.response?.data?.message ||
           error.message ||
           "Could not load return/exchange requests",
-        "error",
+        "error"
       );
     } finally {
       setLoading(false);
@@ -90,15 +96,24 @@ function AdminReturns() {
   }, []);
 
   const handleUpdate = async (request, status) => {
-    const key = `${request.orderId}-${request.itemIndex}`;
+    if (!request.requestId) {
+      showNotification(
+        "Legacy Request",
+        "This is an older request. It needs to be migrated before it can be updated here.",
+        "error"
+      );
+      return;
+    }
+
+    const key = String(request.requestId);
 
     try {
       setProcessing(key);
 
       const data = await updateReturnExchangeStatus(
         request.orderId,
-        request.itemIndex,
-        status,
+        request.requestId,
+        status
       );
 
       if (!data.success) {
@@ -107,7 +122,7 @@ function AdminReturns() {
 
       showNotification(
         "Request Updated",
-        data.message || `Request updated to ${status} successfully`,
+        data.message || `Request updated to ${status} successfully`
       );
 
       await fetchRequests();
@@ -119,7 +134,7 @@ function AdminReturns() {
         error.response?.data?.message ||
           error.message ||
           "Could not update request",
-        "error",
+        "error"
       );
     } finally {
       setProcessing(null);
@@ -127,11 +142,14 @@ function AdminReturns() {
   };
 
   const visibleRequests = requests.filter(
-    (request) => filter === "All" || request.request?.status === filter,
+    (request) =>
+      filter === "All" || request.request?.status === filter
   );
 
   const getCount = (status) =>
-    requests.filter((request) => request.request?.status === status).length;
+    requests.filter(
+      (request) => request.request?.status === status
+    ).length;
 
   const formatDate = (date) => {
     if (!date) return "—";
@@ -151,7 +169,9 @@ function AdminReturns() {
     item.productName || item.name || item.title || "Footwear item";
 
   const getStatusClass = (status) =>
-    `status-${(status || "unknown").toLowerCase().replace(/\s+/g, "-")}`;
+    `status-${(status || "unknown")
+      .toLowerCase()
+      .replace(/\s+/g, "-")}`;
 
   return (
     <AdminLayout title="Returns">
@@ -159,7 +179,9 @@ function AdminReturns() {
         <div className="admin-returns-header">
           <div>
             <h1>Returns & Exchanges</h1>
-            <p>Review and manage customer return and exchange requests.</p>
+            <p>
+              Review and manage customer return and exchange requests.
+            </p>
           </div>
 
           <button
@@ -184,7 +206,9 @@ function AdminReturns() {
             >
               <span>{item.label}</span>
               <strong>
-                {item.value === "All" ? requests.length : getCount(item.value)}
+                {item.value === "All"
+                  ? requests.length
+                  : getCount(item.value)}
               </strong>
             </button>
           ))}
@@ -192,7 +216,8 @@ function AdminReturns() {
 
         <div className="returns-list-header">
           <h2>
-            {FILTERS.find((item) => item.value === filter)?.label || filter}{" "}
+            {FILTERS.find((item) => item.value === filter)?.label ||
+              filter}{" "}
             Requests
           </h2>
           <span>{visibleRequests.length} request(s)</span>
@@ -204,32 +229,51 @@ function AdminReturns() {
           <div className="returns-empty">
             <h3>No {filter.toLowerCase()} requests</h3>
             <p>
-              Requests with this status will appear here. Select All Requests to
-              see every return and exchange.
+              Requests with this status will appear here. Select All
+              Requests to see every return and exchange.
             </p>
           </div>
         ) : (
           <div className="returns-request-list">
-            {visibleRequests.map((request) => {
-              const key = `${request.orderId}-${request.itemIndex}`;
-              const item = request.item || {};
-              const requestStatus = request.request?.status;
-              const requestType = request.request?.type;
+            {visibleRequests.map((entry) => {
+              const item = entry.item || {};
+              const action = entry.request || {};
+
+              const requestId = entry.requestId;
+              const key = String(
+                requestId || `${entry.orderId}-${entry.itemIndex}`
+              );
+
+              const requestStatus = action.status;
+              const requestType = action.type;
               const exchangeStage = EXCHANGE_STAGES[requestStatus];
 
+              const requestedQuantity = Number(action.quantity || 1);
+              const itemPrice = Number(item.price || 0);
+              const refundAmount = Number(action.refundAmount || 0);
+
               return (
-                <article className="returns-request-card" key={key}>
+                <article
+                  className="returns-request-card"
+                  key={key}
+                >
                   <div className="returns-card-top">
                     <div>
                       <span className="returns-request-type">
                         {requestType || "Request"}
                       </span>
-                      <h3>Order #{request.orderNumber}</h3>
+                      <h3>Order #{entry.orderNumber}</h3>
+                      <p>
+                        Request ID:{" "}
+                        {requestId
+                          ? String(requestId).slice(-8).toUpperCase()
+                          : "Legacy"}
+                      </p>
                     </div>
 
                     <span
                       className={`returns-status ${getStatusClass(
-                        requestStatus,
+                        requestStatus
                       )}`}
                     >
                       {requestStatus}
@@ -240,21 +284,39 @@ function AdminReturns() {
                     <div>
                       <span className="returns-label">Product</span>
                       <strong>{getItemName(item)}</strong>
-                      <p>Quantity: {item.quantity ?? "—"}</p>
+
+                      <p>
+                        Original order quantity:{" "}
+                        {item.quantity ?? "—"}
+                      </p>
+
+                      <p>
+                        <strong>
+                          Requested quantity: {requestedQuantity}
+                        </strong>
+                      </p>
+
+                      <p>
+                        Unit price: ₹{itemPrice.toFixed(2)}
+                      </p>
+
                       {item.color && <p>Color: {item.color}</p>}
                       {item.size && <p>Size: {item.size}</p>}
 
                       {requestType === "Exchange" &&
-                        request.request?.replacementVariantId && (
+                        action.replacementVariantId && (
                           <div className="replacement-request-details">
                             <span className="returns-label">
                               Requested replacement
                             </span>
                             <p>
-                              Color: {request.request.replacementColor || "—"}
+                              Color: {action.replacementColor || "—"}
                             </p>
                             <p>
-                              Size: {request.request.replacementSize ?? "—"}
+                              Size: {action.replacementSize ?? "—"}
+                            </p>
+                            <p>
+                              Quantity: {requestedQuantity}
                             </p>
                           </div>
                         )}
@@ -262,96 +324,140 @@ function AdminReturns() {
 
                     <div>
                       <span className="returns-label">Customer</span>
-                      <strong>{request.customerName || "Customer"}</strong>
-                      <p>{request.customerEmail || "No email available"}</p>
+                      <strong>
+                        {entry.customerName || "Customer"}
+                      </strong>
+                      <p>
+                        {entry.customerEmail ||
+                          "No email available"}
+                      </p>
                     </div>
 
                     <div>
                       <span className="returns-label">Request date</span>
                       <strong>
-                        {formatDate(request.request?.requestedAt)}
+                        {formatDate(action.requestedAt)}
                       </strong>
                     </div>
                   </div>
 
                   <div className="returns-reason">
-                    <span className="returns-label">Customer's reason</span>
-                    <p>{request.request?.reason || "No reason provided"}</p>
+                    <span className="returns-label">
+                      Customer's reason
+                    </span>
+                    <p>{action.reason || "No reason provided"}</p>
                   </div>
 
-                  {requestStatus === "Requested" && (
-                    <div className="returns-actions">
-                      <button
-                        type="button"
-                        className="returns-approve-btn"
-                        disabled={processing === key}
-                        onClick={() => handleUpdate(request, "Approved")}
-                      >
-                        {processing === key ? "Updating..." : "Approve"}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="returns-reject-btn"
-                        disabled={processing === key}
-                        onClick={() => handleUpdate(request, "Rejected")}
-                      >
-                        {processing === key ? "Updating..." : "Reject"}
-                      </button>
+                  {!requestId && (
+                    <div className="returns-reason">
+                      <span className="returns-label">
+                        Older request
+                      </span>
+                      <p>
+                        This request uses the previous data format and
+                        cannot be updated using the new request workflow.
+                      </p>
                     </div>
                   )}
 
-                  {requestStatus === "Approved" && requestType === "Return" && (
-                    <div className="returns-actions">
-                      <button
-                        type="button"
-                        className="returns-approve-btn"
-                        disabled={processing === key}
-                        onClick={() => handleUpdate(request, "Completed")}
-                      >
-                        {processing === key
-                          ? "Processing..."
-                          : "Complete Return & Refund"}
-                      </button>
-                    </div>
-                  )}
-
-                  {requestType === "Exchange" && exchangeStage && (
+                  {requestStatus === "Requested" && requestId && (
                     <div className="returns-actions">
                       <button
                         type="button"
                         className="returns-approve-btn"
                         disabled={processing === key}
                         onClick={() =>
-                          handleUpdate(request, exchangeStage.next)
+                          handleUpdate(entry, "Approved")
                         }
                       >
                         {processing === key
                           ? "Updating..."
-                          : exchangeStage.label}
+                          : "Approve"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="returns-reject-btn"
+                        disabled={processing === key}
+                        onClick={() =>
+                          handleUpdate(entry, "Rejected")
+                        }
+                      >
+                        {processing === key
+                          ? "Updating..."
+                          : "Reject"}
                       </button>
                     </div>
                   )}
 
+                  {requestStatus === "Approved" &&
+                    requestType === "Return" &&
+                    requestId && (
+                      <div className="returns-actions">
+                        <button
+                          type="button"
+                          className="returns-approve-btn"
+                          disabled={processing === key}
+                          onClick={() =>
+                            handleUpdate(entry, "Completed")
+                          }
+                        >
+                          {processing === key
+                            ? "Processing..."
+                            : "Complete Return & Refund"}
+                        </button>
+                      </div>
+                    )}
+
+                  {requestType === "Exchange" &&
+                    exchangeStage &&
+                    requestId && (
+                      <div className="returns-actions">
+                        <button
+                          type="button"
+                          className="returns-approve-btn"
+                          disabled={processing === key}
+                          onClick={() =>
+                            handleUpdate(entry, exchangeStage.next)
+                          }
+                        >
+                          {processing === key
+                            ? "Updating..."
+                            : exchangeStage.label}
+                        </button>
+                      </div>
+                    )}
+
                   {requestStatus === "Completed" &&
                     requestType === "Return" && (
                       <div className="returns-reason">
-                        <span className="returns-label">Refund status</span>
+                        <span className="returns-label">
+                          Refund status
+                        </span>
                         <p>
-                          {Number(request.request?.refundAmount || 0) > 0
-                            ? `₹${Number(request.request.refundAmount).toFixed(
-                                2,
+                          {refundAmount > 0
+                            ? `₹${refundAmount.toFixed(
+                                2
                               )} credited to wallet`
-                            : "Return completed"}
+                            : "Return completed; no refund was due."}
                         </p>
+                        {action.refundedAt && (
+                          <p>
+                            Refund date: {formatDate(action.refundedAt)}
+                          </p>
+                        )}
                       </div>
                     )}
 
                   {requestStatus === "Completed" &&
                     requestType === "Exchange" && (
                       <div className="returns-reason">
-                        <span className="returns-label">Exchange status</span>
-                        <p>Replacement exchange completed successfully.</p>
+                        <span className="returns-label">
+                          Exchange status
+                        </span>
+                        <p>
+                          Replacement exchange completed successfully.
+                        </p>
                       </div>
                     )}
                 </article>

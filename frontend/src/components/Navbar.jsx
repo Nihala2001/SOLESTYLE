@@ -6,6 +6,8 @@ import { getActiveCategories } from "../api/services/userCategoryService";
 import { getCart } from "../api/services/userCartService";
 import { getWishlist } from "../api/services/userWishlistService";
 
+import { getActiveProducts } from "../api/services/userProductService";
+
 import "./Navbar.css";
 
 function Navbar() {
@@ -17,6 +19,12 @@ function Navbar() {
 
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
+
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const token = localStorage.getItem("userToken");
 
@@ -100,6 +108,43 @@ function Navbar() {
     setMobileMenu(false);
   };
 
+  useEffect(() => {
+    const query = searchQuery.trim();
+
+    if (!showSearch || query.length < 1) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      try {
+        const data = await getActiveProducts({
+          search: query,
+          page: 1,
+          limit: 5,
+        });
+
+        if (!cancelled) {
+          setSearchSuggestions(data.products || []);
+          setShowSuggestions(true);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSearchSuggestions([]);
+          setShowSuggestions(true);
+        }
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, showSearch]);
+
   return (
     <nav className="navbar">
       {/* ================= LOGO ================= */}
@@ -153,13 +198,14 @@ function Navbar() {
         {/* Search */}
 
         <button
+          type="button"
           className="navbar-icon"
-          onClick={() => navigate("/products")}
+          onClick={() => setShowSearch((prev) => !prev)}
           title="Search"
+          aria-label="Search products"
         >
           <Search size={20} />
         </button>
-
         {/* Wishlist */}
         <button
           className="navbar-icon"
@@ -199,6 +245,71 @@ function Navbar() {
         </button>
       </div>
 
+      {showSearch && (
+        <div className="navbar-search-container">
+          <form
+            className="navbar-search-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+
+              const query = searchQuery.trim();
+
+              if (query) {
+                navigate(`/products?search=${encodeURIComponent(query)}`);
+                setShowSearch(false);
+                setShowSuggestions(false);
+                setSearchQuery("");
+              }
+            }}
+          >
+            <input
+              type="search"
+              placeholder="Search footwear..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => {
+                if (searchQuery.trim()) {
+                  setShowSuggestions(true);
+                }
+              }}
+              autoFocus
+            />
+
+            <button type="submit" aria-label="Submit search">
+              <Search size={18} />
+            </button>
+          </form>
+
+          {showSuggestions && (
+            <div className="navbar-search-suggestions">
+              {searchSuggestions.length > 0 ? (
+                searchSuggestions.map((product) => (
+                  <button
+                    type="button"
+                    className="navbar-search-suggestion"
+                    key={product._id}
+                    onClick={() => {
+                      navigate(
+                        `/products?search=${encodeURIComponent(product.name)}`,
+                      );
+                      setShowSearch(false);
+                      setShowSuggestions(false);
+                      setSearchQuery("");
+                    }}
+                  >
+                    <span>{product.name}</span>
+                    <Search size={15} />
+                  </button>
+                ))
+              ) : (
+                <p className="navbar-search-empty">
+                  No matching products found
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       {/* ================= MOBILE MENU BUTTON ================= */}
 
       <button

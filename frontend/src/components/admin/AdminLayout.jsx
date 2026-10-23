@@ -55,6 +55,14 @@ function AdminLayout({ children, title }) {
           </button>
 
           <button
+            onClick={() => navigate("/admin/returns")}
+            className="menu-item"
+          >
+            <span>↩</span>
+            Return&Exchange
+          </button>
+
+          <button
             onClick={() => navigate("/admin/categories")}
             className="menu-item"
           >
@@ -78,38 +86,24 @@ function AdminLayout({ children, title }) {
             Coupons
           </button>
 
-          <button className="menu-item">
-            <span>▧</span>
-            Banners
-          </button>
-
-         
-
-          <button className="menu-item">
+          <button
+            className="menu-item"
+            onClick={() => navigate("/admin/sales-report")}
+          >
             <span>▥</span>
             Sales Report
           </button>
 
-          <button className="menu-item">
-            <span>☆</span>
-            Reviews
-          </button>
-
           <button
-            onClick={() => navigate("/admin/returns")}
+            onClick={() => navigate("/admin/reviews")}
             className="menu-item"
           >
-            <span>↩</span>
-            Return&Exchange
+            <span>☆</span>
+            Reviews
           </button>
         </nav>
 
         <div className="sidebar-bottom">
-          <button className="menu-item">
-            <span>⚙</span>
-            Settings
-          </button>
-
           <button className="logout-button" onClick={handleLogout}>
             <span>⇥</span>
             Logout

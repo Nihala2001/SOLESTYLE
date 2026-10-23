@@ -78,10 +78,13 @@ const registerUser = async (req, res) => {
       referralCode,
     });
 
-    return res.status(201).json({
-      message: "Registration successful. Please verify your OTP.",
-      userId: result.userId,
-    });
+    
+return res.status(201).json({
+  message: "Registration successful. Please verify your OTP.",
+  userId: result.userId,
+  expiresAt: result.expiresAt,
+});
+
 
   } catch (error) {
     console.error("Register error:", error);

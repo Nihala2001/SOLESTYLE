@@ -160,14 +160,14 @@ function Login() {
 
   // ======================== NOTIFICATION CLOSE ======================== //
 
-  const handleNotificationClose = () => {
-    setShowNotification(false);
+const handleNotificationClose = () => {
+  setShowNotification(false);
 
-    // Only navigate after successful login
-    if (notificationType === "success") {
-      navigate("/home");
-    }
-  };
+  // Navigate after successful login and replace login history
+  if (notificationType === "success") {
+    navigate("/home", { replace: true });
+  }
+};
 
   // ======================== CLEAR ERROR ======================== //
 

@@ -4,6 +4,7 @@
 }
 
 .admin-layout {
+  width: 100%;
   min-height: 100vh;
   display: flex;
   background: #f8f1ec;
@@ -14,16 +15,17 @@
 /* ================= SIDEBAR ================= */
 
 .admin-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
   width: 250px;
-  min-height: 100vh;
   background: #f1d7d5;
   border-right: 1px solid #e3c2c0;
   display: flex;
   flex-direction: column;
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  overflow-y: auto;
+  z-index: 100;
 }
 
 .admin-logo {
@@ -49,7 +51,6 @@
 .admin-menu {
   padding: 20px 15px;
   flex: 1;
-  overflow-y: auto;
 }
 
 .menu-item {
@@ -73,6 +74,7 @@
   width: 20px;
   text-align: center;
   font-size: 17px;
+  flex-shrink: 0;
 }
 
 .menu-item:hover {
@@ -81,8 +83,10 @@
 }
 
 .sidebar-bottom {
+  margin-top: auto;
   padding: 15px;
   border-top: 1px solid #dfc0bd;
+  flex-shrink: 0;
 }
 
 .logout-button {
@@ -104,103 +108,221 @@
   background: #e8c2c2;
 }
 
-/* ================= MAIN ================= */
+/* ================= MAIN AREA ================= */
 
 .admin-main {
-margin-left: 250px;
-width: calc(100% - 250px);
-min-width: 0;
-min-height: 100vh;
-flex: 1;
+  margin-left: 250px;
+  width: calc(100% - 250px);
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 100vh;
 }
 
+/* ================= TOPBAR ================= */
+
 .admin-topbar {
-min-height: 90px;
-background: #fffaf7;
-border-bottom: 1px solid #eadbd4;
-padding: 0 24px;
-display: flex;
-align-items: center;
-justify-content: space-between;
-gap: 16px;
+  width: 100%;
+  min-height: 90px;
+  background: #fffaf7;
+  border-bottom: 1px solid #eadbd4;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .admin-topbar h2 {
-margin: 0;
-font-size: 24px;
-color: #3d3030;
+  margin: 0;
+  font-size: 24px;
+  color: #3d3030;
 }
 
 .admin-topbar p {
-margin: 5px 0 0;
-color: #967f7f;
-font-size: 13px;
+  margin: 5px 0 0;
+  color: #967f7f;
+  font-size: 13px;
 }
 
 .admin-profile {
-display: flex;
-align-items: center;
-gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .admin-profile strong {
-display: block;
-font-size: 14px;
+  display: block;
+  font-size: 14px;
 }
 
 .admin-profile span {
-display: block;
-color: #9a8585;
-font-size: 11px;
-margin-top: 3px;
+  display: block;
+  color: #9a8585;
+  font-size: 11px;
+  margin-top: 3px;
 }
 
 .admin-avatar {
-width: 42px;
-height: 42px;
-border-radius: 50%;
-background: #b85c70;
-color: white;
-display: flex;
-justify-content: center;
-align-items: center;
-font-weight: bold;
-flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #b85c70;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  flex-shrink: 0;
 }
+
+/* ================= CONTENT ================= */
 
 .admin-content {
-width: 100%;
-min-width: 0;
-padding: 24px;
-overflow-x: hidden;
+  display: block;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 24px;
+  overflow-x: auto;
 }
 
-/* ================= MOBILE ================= */
+/* ================= TABLET ================= */
 
 @media (max-width: 768px) {
-.admin-sidebar {
-width: 200px;
+  .admin-sidebar {
+    width: 200px;
+  }
+
+  .admin-main {
+    margin-left: 200px;
+    width: calc(100% - 200px);
+  }
+
+  .admin-logo {
+    padding: 22px 15px;
+  }
+
+  .admin-menu {
+    padding: 15px 10px;
+  }
+
+  .menu-item {
+    padding: 10px 8px;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .admin-topbar {
+    padding: 14px 12px;
+    gap: 8px;
+  }
+
+  .admin-topbar h2 {
+    font-size: 18px;
+  }
+
+  .admin-content {
+    padding: 16px 12px;
+  }
+}
+
+/* ================= SMALL MOBILE ================= */
+
+@media (max-width: 480px) {
+  .admin-sidebar {
+    width: 145px;
+  }
+
+  .admin-main {
+    margin-left: 145px;
+    width: calc(100% - 145px);
+  }
+
+  .admin-logo h1 {
+    font-size: 18px;
+    letter-spacing: 1px;
+  }
+
+  .admin-logo span {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+
+  .menu-item {
+    padding: 10px 6px;
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .menu-item span {
+    width: 16px;
+    font-size: 14px;
+  }
+
+  .admin-topbar {
+    flex-wrap: wrap;
+  }
+
+  .admin-topbar h2 {
+    font-size: 16px;
+  }
+
+  .admin-profile strong {
+    font-size: 11px;
+  }
+
+  .admin-profile span {
+    font-size: 10px;
+  }
+
+  .admin-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .admin-content {
+    padding: 12px 8px;
+  }
+}
+
+
+
+/* Expand the root only when an admin page is displayed */
+#root:has(.admin-layout) {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border: none;
+  text-align: left;
+}
+
+/* Use the full available screen width for the admin layout */
+.admin-layout {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
 }
 
 .admin-main {
-margin-left: 200px;
-width: calc(100% - 200px);
+  width: calc(100% - 250px);
+  flex: none;
+  margin-left: 250px;
+  min-width: 0;
 }
 
-.admin-topbar {
-padding: 0 12px;
-gap: 8px;
+/* Keep the sidebar and main content aligned on smaller screens */
+@media (max-width: 768px) {
+  .admin-main {
+    width: calc(100% - 200px);
+    margin-left: 200px;
+  }
 }
 
-.admin-topbar h2 {
-font-size: 18px;
-}
-
-.admin-profile {
-gap: 6px;
-}
-
-.admin-content {
-padding: 12px;
-}
+@media (max-width: 480px) {
+  .admin-main {
+    width: calc(100% - 145px);
+    margin-left: 145px;
+  }
 }

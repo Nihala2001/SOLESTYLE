@@ -15,6 +15,31 @@ function RegisterOtp() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
+  const [expiresAt, setExpiresAt] = useState(
+    location.state?.expiresAt
+      ? new Date(location.state.expiresAt).getTime()
+      : null,
+  );
+
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  const isOtpExpired = expiresAt !== null && currentTime >= expiresAt;
+
+  const remainingSeconds =
+    expiresAt !== null
+      ? Math.max(0, Math.ceil((expiresAt - currentTime) / 1000))
+      : null;
+
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remaining = seconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(
+      2,
+      "0",
+    )}`;
+  };
+
   // ================= NOTIFICATION MODAL =================
 
   const [showNotification, setShowNotification] = useState(
@@ -33,19 +58,17 @@ function RegisterOtp() {
 
   const [notificationType, setNotificationType] = useState("success");
 
-  // ================= REMOVE OTP SENT FLAG =================
-
   useEffect(() => {
-    if (location.state?.showOtpSentNotification) {
-      navigate("/verify-otp", {
-        replace: true,
-        state: {
-          email,
-        },
-      });
-    }
-  }, [location.state?.showOtpSentNotification, email, navigate]);
+    if (!expiresAt) return;
 
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+ 
   // ================= SHOW NOTIFICATION =================
 
   const showNotificationMessage = (title, message, type = "success") => {
@@ -88,6 +111,11 @@ function RegisterOtp() {
       return;
     }
 
+    if (!expiresAt || Date.now() >= expiresAt) {
+      setError("OTP expired. Please request a new OTP.");
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -108,11 +136,7 @@ function RegisterOtp() {
     } catch (error) {
       console.error("OTP verification error:", error);
 
-       setError(
-    error.response?.data?.message ||
-    "Invalid OTP."
-      );
-
+      setError(error.response?.data?.message || "Invalid OTP.");
     } finally {
       setLoading(false);
     }
@@ -131,7 +155,20 @@ function RegisterOtp() {
     try {
       setResending(true);
 
-     const data = await resendOtp(email);
+      const data = await resendOtp(email);
+
+      const newExpiry = data?.expiresAt || data?.data?.expiresAt;
+
+      if (newExpiry) {
+        setExpiresAt(new Date(newExpiry).getTime());
+        setCurrentTime(Date.now());
+        setOtp("");
+        setError("");
+      } else {
+        setError(
+          "OTP was sent, but its expiry time was not received. Please check your backend response.",
+        );
+      }
 
       // Resend successful
       showNotificationMessage(
@@ -142,11 +179,7 @@ function RegisterOtp() {
     } catch (error) {
       console.error("Resend OTP error:", error);
 
-      setError(
-    error.response?.data?.message ||
-    "Failed to resend OTP."
-     );
-
+      setError(error.response?.data?.message || "Failed to resend OTP.");
     } finally {
       setResending(false);
     }
@@ -192,6 +225,20 @@ function RegisterOtp() {
               }}
             />
 
+            {expiresAt ? (
+              <p
+                className={`otp-expiry ${isOtpExpired ? "otp-expired" : ""}`}
+                aria-live="polite"
+              >
+                {isOtpExpired
+                  ? "OTP expired. Please request a new OTP."
+                  : `OTP expires in ${formatTime(remainingSeconds)}`}
+              </p>
+            ) : (
+              <p className="otp-expired">
+                OTP expiry time unavailable. Please resend the OTP.
+              </p>
+            )}
             {/* ERROR */}
 
             {error && <p className="otp-error">{error}</p>}
@@ -199,9 +246,13 @@ function RegisterOtp() {
             <button
               type="submit"
               className="otp-verify-button"
-              disabled={loading}
+              disabled={loading || isOtpExpired || !expiresAt}
             >
-              {loading ? "VERIFYING..." : "VERIFY OTP"}
+              {loading
+                ? "VERIFYING..."
+                : isOtpExpired
+                  ? "OTP EXPIRED"
+                  : "VERIFY OTP"}
             </button>
           </form>
 

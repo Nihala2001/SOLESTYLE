@@ -266,3 +266,22 @@
     padding: 30px 20px;
   }
 }
+.otp-expiry {
+  margin: 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #8b6b56;
+  text-align: center;
+}
+
+.otp-expired {
+  color: #c0392b;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+}
+
+.otp-verify-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

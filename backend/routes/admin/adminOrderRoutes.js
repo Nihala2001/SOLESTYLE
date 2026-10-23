@@ -18,7 +18,7 @@ router.get("/", adminAuthMiddleware, getAllOrders);
 router.get("/returns", adminAuthMiddleware, getReturnExchangeRequests);
 
 router.patch(
-    "/returns/:orderId/:itemIndex",
+    "/returns/:orderId/:requestId",
     adminAuthMiddleware,
     updateReturnExchangeStatus
 );

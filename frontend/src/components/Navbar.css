@@ -399,3 +399,142 @@
   white-space: nowrap;
   pointer-events: none;
 }
+.navbar-search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fffaf7;
+  border: 1px solid #e8cfc6;
+  border-radius: 24px;
+  padding: 6px 12px;
+}
+
+.navbar-search-form input {
+  width: 190px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #4b3434;
+  font-size: 14px;
+}
+
+.navbar-search-form button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #a65d72;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .navbar-search-form {
+    position: absolute;
+    top: 100%;
+    left: 12px;
+    right: 12px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .navbar-search-form input {
+    width: 100%;
+  }
+}
+
+
+/* Search overlays the navbar instead of shifting its elements */
+.navbar-search-container {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  z-index: 2000;
+  background: #fffaf7;
+  border: 1px solid #e8cfc6;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.navbar-search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fffaf7;
+  border: 1px solid #e8cfc6;
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.navbar-search-form input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #4b3434;
+  font-size: 14px;
+}
+
+.navbar-search-form button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #a65d72;
+  cursor: pointer;
+}
+
+.navbar-search-suggestions {
+  max-height: 280px;
+  overflow-y: auto;
+  border-top: 1px solid #f0dfd8;
+  padding: 4px 0;
+}
+
+.navbar-search-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: #4b3434;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.navbar-search-suggestion:hover {
+  background: #f8ece8;
+}
+
+.navbar-search-suggestion span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navbar-search-empty {
+  padding: 10px 14px;
+  margin: 0;
+  color: #806c6c;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .navbar-search-container {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+  }
+}

@@ -61,8 +61,9 @@ const registerUser = async ({
   );
 
   return {
-    userId: user._id,
-  };
+  userId: user._id,
+  expiresAt: expireAt.toISOString(),
+};
 };
 
 // ======================================================
@@ -155,8 +156,9 @@ const resendOtp = async ({ email }) => {
   );
 
   return {
-    message: "OTP resent successfully",
-  };
+  message: "OTP resent successfully",
+  expiresAt: expireAt.toISOString(),
+};
 };
 
 // ======================================================
@@ -198,6 +200,7 @@ const loginUser = async ({ email, password }) => {
       id: user._id,
       name: user.name,
       email: user.email,
+      isGoogleUser: Boolean(user.googleId),
     },
   };
 };
@@ -238,8 +241,9 @@ const forgotPassword = async ({ email }) => {
   );
 
   return {
-    message: "OTP sent successfully",
-  };
+  message: "OTP sent successfully",
+  expiresAt: expireAt.toISOString(),
+};
 };
 
 // ======================================================
@@ -392,6 +396,7 @@ const googleLogin = async (idToken) => {
       id: user._id,
       name: user.name,
       email: user.email,
+      isGoogleUser: Boolean(user.googleId),
     },
   };
 };
@@ -423,6 +428,12 @@ const sendChangeEmailOtp = async ({
   if (!user.isActive) {
     throw new Error("Your account has been blocked");
   }
+
+  if (user.googleId) {
+  throw new Error(
+    "Email address cannot be changed for Google-authenticated accounts"
+  );
+}
 
   if (user.email === newEmail) {
     throw new Error(
@@ -479,8 +490,9 @@ const sendChangeEmailOtp = async ({
   );
 
   return {
-    message: "OTP sent successfully",
-  };
+  message: "OTP sent successfully",
+  expiresAt: expireAt.toISOString(),
+};
 };
 
 // ======================================================
@@ -520,6 +532,12 @@ const verifyChangeEmailOtp = async ({
   if (!user.isActive) {
     throw new Error("Your account has been blocked");
   }
+
+  if (user.googleId) {
+  throw new Error(
+    "Email address cannot be changed for Google-authenticated accounts"
+  );
+}
 
   // Check again before changing email
   const existingUser = await User.findOne({
@@ -652,8 +670,9 @@ const sendChangePasswordOtp = async ({
   );
 
   return {
-    message: "OTP sent successfully",
-  };
+  message: "OTP sent successfully",
+  expiresAt: expireAt.toISOString(),
+};
 };
 
 // ======================================================

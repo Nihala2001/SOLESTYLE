@@ -96,12 +96,17 @@ function Register() {
 
       // Go to OTP verification page
       // and tell RegisterOtp that OTP was sent
-      navigate("/verify-otp", {
-        state: {
-          email: trimmedEmail,
-          showOtpSentNotification: true,
-        },
-      });
+      // Go to OTP verification page with expiry time
+const expiresAt =
+  data?.expiresAt || data?.data?.expiresAt;
+
+navigate("/verify-otp", {
+  state: {
+    email: trimmedEmail,
+    expiresAt,
+    showOtpSentNotification: true,
+  },
+});
 
     }catch (error) {
   console.error(

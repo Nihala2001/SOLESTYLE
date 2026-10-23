@@ -13,6 +13,7 @@ const wishlistRoutes = require("./routes/user/wishlistRoutes");
 const orderRoutes = require("./routes/user/orderRoutes");
 const couponRoutes = require("./routes/user/couponRoutes");
 const walletRoutes = require("./routes/user/walletRoutes");
+const reviewRoutes = require("./routes/user/reviewRoutes");
 
 
 
@@ -25,6 +26,9 @@ const adminVariantRoutes = require("./routes/admin/adminVariantRoutes");
 const adminOrderRoutes = require("./routes/admin/adminOrderRoutes");
 const adminCouponRoutes = require("./routes/admin/adminCouponRoutes");
 const adminOfferRoutes = require("./routes/admin/adminOfferRoutes");
+const adminReviewRoutes = require("./routes/admin/adminReviewRoutes");
+const adminSalesReportRoutes = require("./routes/admin/adminSalesReportRoutes");
+const adminDashboardRoutes = require("./routes/admin/adminDashboardRoutes");
 
 
 
@@ -43,6 +47,7 @@ app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/user/coupons", couponRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 
 
@@ -55,6 +60,9 @@ app.use("/api/admin/variants", adminVariantRoutes);
 app.use("/api/admin/orders", adminOrderRoutes);
 app.use("/api/admin/coupons", adminCouponRoutes);
 app.use("/api/admin/offers", adminOfferRoutes);
+app.use("/api/admin/reviews", adminReviewRoutes);
+app.use("/api/admin/sales-report", adminSalesReportRoutes);
+app.use("/api/admin/dashboard", adminDashboardRoutes);
 
 
 connectDB();

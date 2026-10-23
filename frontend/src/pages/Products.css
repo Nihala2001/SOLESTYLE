@@ -310,3 +310,40 @@ padding: 12px;
   font-size: 0.75rem;
   font-weight: 600;
 }
+
+/* ================= PRODUCT WISHLIST BUTTON ================= */
+
+.product-wishlist-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 40px;
+  height: 40px;
+  padding: 0;
+
+  background: #ffffff;
+  color: #c47d91;
+  border: 1px solid #eadbd4;
+  border-radius: 50%;
+
+  cursor: pointer;
+  opacity: 1;
+  visibility: visible;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.product-wishlist-button svg {
+  display: block;
+  stroke: currentColor;
+}
+
+.product-wishlist-button:hover {
+  background: #f8e5eb;
+  color: #b84f70;
+}

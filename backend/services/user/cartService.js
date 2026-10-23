@@ -5,6 +5,8 @@ const Product = require("../../models/Product");
 const { getVariantPricing } = require("./offerPricingService");
 
 // Get cart with current product and variant information
+
+
 const getCart = async (userId) => {
     let cart = await Cart.findOne({ userId });
 
@@ -18,27 +20,106 @@ const getCart = async (userId) => {
     const items = [];
 
     for (const item of cart.items) {
-        const variant = await Variant.findOne({
-            _id: item.variantId,
-            isActive: true,
-        }).lean();
+        const variant = await Variant.findById(item.variantId).lean();
 
-        if (!variant) continue;
+        // Variant was removed: keep the cart entry visible.
+        if (!variant) {
+            items.push({
+                _id: item._id,
+                variantId: String(item.variantId),
+                quantity: item.quantity,
+                price: 0,
+                originalPrice: 0,
+                offerDiscount: 0,
+                stock: 0,
+                image: "",
+                color: "",
+                size: "",
+                product: {
+                    name: "Product no longer available",
+                },
+                availability: "unavailable",
+                unavailableReason: "Product not available",
+            });
+            continue;
+        }
 
-        const product = await Product.findOne({
-            _id: variant.productId,
-            isActive: true,
-        })
+        // Find the product even when it has been soft-deleted.
+        const product = await Product.findById(variant.productId)
             .populate("categoryId", "name")
             .lean();
 
-        if (!product) continue;
+        // Product was permanently removed: keep a fallback entry.
+        if (!product) {
+            items.push({
+                _id: item._id,
+                variantId: String(item.variantId),
+                quantity: item.quantity,
+                price: 0,
+                originalPrice: 0,
+                offerDiscount: 0,
+                stock: 0,
+                image:
+                    variant.mainImage ||
+                    variant.productImages?.[0] ||
+                    "",
+                color: variant.color || "",
+                size: variant.size || "",
+                product: {
+                    name: "Product no longer available",
+                },
+                availability: "unavailable",
+                unavailableReason: "Product not available",
+            });
+            continue;
+        }
+
+        // Soft-deleted product or inactive variant.
+        if (product.isActive === false || variant.isActive === false) {
+            items.push({
+                _id: item._id,
+                variantId: String(variant._id),
+                quantity: item.quantity,
+                price: Number(variant.price ?? product.basePrice ?? 0),
+                originalPrice: Number(variant.price ?? product.basePrice ?? 0),
+                offerDiscount: 0,
+                stock: Number(variant.stock || 0),
+                image:
+                    variant.mainImage ||
+                    variant.productImages?.[0] ||
+                    product.images?.[0] ||
+                    "",
+                color: variant.color || "",
+                size: variant.size || "",
+                product: {
+                    _id: product._id,
+                    name: product.name,
+                    categoryId: product.categoryId,
+                },
+                availability: "unavailable",
+                unavailableReason: "Product not available",
+            });
+            continue;
+        }
 
         const pricing = await getVariantPricing(variant, product);
+        const stock = Number(variant.stock || 0);
+
+        let availability = "available";
+        let unavailableReason = "";
+
+        if (stock <= 0) {
+            availability = "out_of_stock";
+            unavailableReason = "This variant is currently out of stock.";
+        } else if (Number(item.quantity) > stock) {
+            availability = "insufficient_stock";
+            unavailableReason =
+                `Only ${stock} item(s) available. Please reduce the quantity.`;
+        }
 
         items.push({
             _id: item._id,
-            variantId: variant._id,
+            variantId: String(variant._id),
             quantity: item.quantity,
             color: variant.color,
             size: variant.size,
@@ -46,7 +127,7 @@ const getCart = async (userId) => {
             originalPrice: pricing.originalPrice,
             offerDiscount: pricing.offerDiscount,
             offerName: pricing.offerName,
-            stock: variant.stock,
+            stock,
             image:
                 variant.mainImage ||
                 variant.productImages?.[0] ||
@@ -57,6 +138,8 @@ const getCart = async (userId) => {
                 name: product.name,
                 categoryId: product.categoryId,
             },
+            availability,
+            unavailableReason,
         });
     }
 

@@ -1,0 +1,71 @@
+
+.about-page {
+  color: #4b3434;
+  background: #fffaf7;
+  min-height: 70vh;
+  padding-bottom: 60px;
+}
+
+.about-hero {
+  text-align: center;
+  padding: 75px 20px;
+  background: linear-gradient(135deg, #f8e8e8, #f4e8d9);
+}
+
+.about-eyebrow {
+  color: #a65d72;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 3px;
+}
+
+.about-hero h1 {
+  font-size: clamp(30px, 5vw, 48px);
+  margin: 16px 0;
+  color: #704452;
+}
+
+.about-hero > p:last-child {
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.8;
+}
+
+.about-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 45px 24px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.about-section {
+  padding: 25px;
+  background: #ffffff;
+  border: 1px solid #f0dfd8;
+  border-radius: 14px;
+}
+
+.about-section h2 {
+  color: #a65d72;
+  font-size: 21px;
+  margin-top: 0;
+}
+
+.about-section p {
+  line-height: 1.8;
+  font-size: 15px;
+  color: #6e5a5a;
+}
+
+@media (max-width: 700px) {
+  .about-content {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .about-hero {
+    padding: 55px 20px;
+  }
+}

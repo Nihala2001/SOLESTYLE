@@ -267,3 +267,13 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+.cart-unavailable-message {
+  color: #b42318;
+  background: #fff1f0;
+  border: 1px solid #f3b6b2;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 10px 0;
+  font-size: 13px;
+  line-height: 1.5;
+}

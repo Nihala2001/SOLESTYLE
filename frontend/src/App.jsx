@@ -10,6 +10,7 @@ import Login from "./components/authentication/Login";
 import ForgotPassword from "./components/authentication/ForgotPassword";
 import ForgotPasswordOtp from "./components/authentication/ForgotPasswordOtp";
 import ResetPassword from "./components/authentication/ResetPassword";
+import GuestRoute from "./components/GuestRoute";
 
 import Home from "./pages/Home";
 import UserProfile from "./pages/UserProfile";
@@ -20,7 +21,7 @@ import Wishlist from "./pages/Wishlist";
 import Checkout from "./pages/Checkout";
 import OrderTracking from "./pages/OrderTracking";
 import Wallet from "./pages/Wallet";
-
+import AboutUs from "./pages/AboutUs";
 
 import AdminLogin from "./components/admin/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -37,6 +38,8 @@ import AdminEditProduct from "./pages/AdminEditProduct";
 import AdminReturns from "./pages/AdminReturns";
 import AdminCoupons from "./pages/AdminCoupons";
 import AdminOffers from "./pages/AdminOffers";
+import AdminReviews from "./pages/AdminReviews";
+import AdminSalesReport from "./pages/AdminSalesReport";
 
 function App() {
   return (
@@ -66,15 +69,18 @@ function App() {
           <Route path="/orders/:orderId/track" element={<OrderTracking />} />
 
           <Route path="/wallet" element={<Wallet />} />
+
+          <Route path="/about" element={<AboutUs />} />
         </Route>
 
         {/* ================= AUTHENTICATION ================= */}
 
-        <Route path="/register" element={<Register />} />
+        <Route element={<GuestRoute />}>
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+        </Route>
 
         <Route path="/verify-otp" element={<RegisterOtp />} />
-
-        <Route path="/login" element={<Login />} />
 
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
@@ -123,6 +129,9 @@ function App() {
 
         <Route path="/admin/offers" element={<AdminOffers />} />
 
+        <Route path="/admin/reviews" element={<AdminReviews />} />
+
+        <Route path="/admin/sales-report" element={<AdminSalesReport />} />
       </Routes>
     </BrowserRouter>
   );

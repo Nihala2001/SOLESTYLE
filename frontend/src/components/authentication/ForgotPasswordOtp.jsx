@@ -1,8 +1,11 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import NotificationModal from "../common/NotificationModal";
-import {  verifyForgotPasswordOtp, resendForgotPasswordOtp, } from "../../api/services/authServices";
+import {
+  verifyForgotPasswordOtp,
+  resendForgotPasswordOtp,
+} from "../../api/services/authServices";
 import "./ForgotPasswordOtp.css";
 
 function ForgotPasswordOtp() {
@@ -14,10 +17,57 @@ function ForgotPasswordOtp() {
     sessionStorage.getItem("forgotPasswordEmail") ||
     "";
 
+  const getExpiryTimestamp = (value) => {
+    if (!value) return null;
+
+    const timestamp =
+      typeof value === "number" ? value : Date.parse(value);
+
+    return Number.isFinite(timestamp) ? timestamp : null;
+  };
+
+  const [expiresAt, setExpiresAt] = useState(() =>
+    getExpiryTimestamp(location.state?.expiresAt)
+  );
+
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+
+  const isOtpExpired =
+    expiresAt !== null && currentTime >= expiresAt;
+
+  const remainingSeconds =
+    expiresAt !== null
+      ? Math.max(
+          0,
+          Math.ceil((expiresAt - currentTime) / 1000)
+        )
+      : null;
+
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remaining = seconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(
+      remaining
+    ).padStart(2, "0")}`;
+  };
+
+  // ================= COUNTDOWN =================
+
+  useEffect(() => {
+    if (expiresAt === null) return;
+
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [expiresAt]);
 
   // ================= NOTIFICATION MODAL =================
 
@@ -42,12 +92,9 @@ function ForgotPasswordOtp() {
   const handleNotificationClose = () => {
     setShowNotification(false);
 
-    // After OTP verification
     if (notificationTitle === "OTP Verified") {
       navigate("/reset-password", {
-        state: {
-          email,
-        },
+        state: { email },
       });
     }
   };
@@ -56,7 +103,6 @@ function ForgotPasswordOtp() {
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
-
     setError("");
 
     if (!email) {
@@ -74,35 +120,39 @@ function ForgotPasswordOtp() {
       return;
     }
 
+    if (expiresAt === null) {
+      setError("OTP expiry time is unavailable. Please request a new OTP.");
+      return;
+    }
+
+    if (Date.now() >= expiresAt) {
+      setCurrentTime(Date.now());
+      setError("OTP expired. Please request a new OTP.");
+      return;
+    }
+
     try {
       setLoading(true);
 
-        await verifyForgotPasswordOtp({
-       email,
-       otp,
-       });
+      await verifyForgotPasswordOtp({
+        email,
+        otp,
+      });
 
-      // OTP verified successfully
       showNotificationMessage(
         "OTP Verified",
         "Your OTP has been verified successfully.",
         "success"
       );
+    } catch (error) {
+      console.error("Forgot password OTP error:", error);
 
-    }catch (error) {
-  console.error(
-    "Forgot password OTP error:",
-    error
-  );
-
-  setError(
-    error.response?.data?.message ||
-    "Invalid OTP."
-  );
-
-} finally {
-  setLoading(false);
-}
+      setError(
+        error.response?.data?.message || "Invalid OTP."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ================= RESEND OTP =================
@@ -118,40 +168,49 @@ function ForgotPasswordOtp() {
     try {
       setResending(true);
 
-     await resendForgotPasswordOtp(email);
+      const response = await resendForgotPasswordOtp(email);
 
-      // New OTP sent
+      const newExpiry =
+        response?.expiresAt ||
+        response?.data?.expiresAt;
+
+      const newExpiryTimestamp =
+        getExpiryTimestamp(newExpiry);
+
+      if (newExpiryTimestamp === null) {
+        setError(
+          "OTP was sent, but its expiry time was not received. Please check the backend response."
+        );
+        return;
+      }
+
+      setExpiresAt(newExpiryTimestamp);
+      setCurrentTime(Date.now());
+      setOtp("");
+
       showNotificationMessage(
         "OTP Sent",
         "A new OTP has been sent to your email.",
         "success"
       );
+    } catch (error) {
+      console.error("Resend OTP error:", error);
 
-    }catch (error) {
-  console.error(
-    "Resend OTP error:",
-    error
-  );
-
-  setError(
-    error.response?.data?.message ||
-    "Failed to resend OTP."
-  );
-
-} finally {
-  setResending(false);
-}
+      setError(
+        error.response?.data?.message ||
+          "Failed to resend OTP."
+      );
+    } finally {
+      setResending(false);
+    }
   };
 
   // ================= UI =================
 
   return (
     <div className="forgot-otp-page">
-
       <div className="forgot-otp-card">
-
         <div className="forgot-otp-heading">
-
           <p>ACCOUNT RECOVERY</p>
 
           <h2>Verify OTP</h2>
@@ -159,18 +218,12 @@ function ForgotPasswordOtp() {
           <span>
             Enter the 6-digit OTP sent to
             <br />
-            <strong>
-              {email || "your email"}
-            </strong>
+            <strong>{email || "your email"}</strong>
           </span>
-
         </div>
 
         <form onSubmit={handleVerifyOtp}>
-
-          <label htmlFor="otp">
-            ENTER OTP
-          </label>
+          <label htmlFor="otp">ENTER OTP</label>
 
           <input
             id="otp"
@@ -189,61 +242,70 @@ function ForgotPasswordOtp() {
             }}
           />
 
+          {/* OTP EXPIRY COUNTDOWN */}
+
+          {expiresAt === null ? (
+            <p className="forgot-otp-expired" aria-live="polite">
+              OTP expiry time unavailable. Please resend the OTP.
+            </p>
+          ) : isOtpExpired ? (
+            <p className="forgot-otp-expired" aria-live="polite">
+              OTP expired. Please request a new OTP.
+            </p>
+          ) : (
+            <p className="forgot-otp-expiry" aria-live="polite">
+              OTP expires in {formatTime(remainingSeconds)}
+            </p>
+          )}
+
           {error && (
-            <p className="forgot-otp-error">
+            <p className="forgot-otp-error" role="alert">
               {error}
             </p>
           )}
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={
+              loading ||
+              resending ||
+              expiresAt === null ||
+              isOtpExpired
+            }
           >
             {loading
               ? "VERIFYING..."
-              : "VERIFY OTP"}
+              : isOtpExpired
+                ? "OTP EXPIRED"
+                : "VERIFY OTP"}
           </button>
-
         </form>
 
-        {/* ================= RESEND ================= */}
+        {/* RESEND OTP */}
 
         <div className="forgot-otp-resend">
-
-          <span>
-            Didn't receive the OTP?
-          </span>
+          <span>Didn't receive the OTP?</span>
 
           <button
             type="button"
             onClick={handleResendOtp}
-            disabled={resending}
+            disabled={resending || loading}
           >
-            {resending
-              ? "SENDING..."
-              : "RESEND OTP"}
+            {resending ? "SENDING..." : "RESEND OTP"}
           </button>
-
         </div>
 
-        {/* ================= BACK ================= */}
+        {/* BACK */}
 
         <div className="forgot-otp-back">
-
           <button
             type="button"
-            onClick={() =>
-              navigate("/forgot-password")
-            }
+            onClick={() => navigate("/forgot-password")}
           >
             ← BACK
           </button>
-
         </div>
-
       </div>
-
-      {/* ================= NOTIFICATION MODAL ================= */}
 
       <NotificationModal
         isOpen={showNotification}
@@ -252,7 +314,6 @@ function ForgotPasswordOtp() {
         message={notificationMessage}
         type={notificationType}
       />
-
     </div>
   );
 }

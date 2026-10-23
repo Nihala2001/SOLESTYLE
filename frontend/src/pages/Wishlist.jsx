@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ShoppingBag, Trash2 } from "lucide-react";
@@ -34,9 +33,7 @@ function Wishlist() {
       }
     } catch (err) {
       console.error("Failed to fetch wishlist:", err);
-      setError(
-        err.response?.data?.message || "Failed to load wishlist"
-      );
+      setError(err.response?.data?.message || "Failed to load wishlist");
     } finally {
       setLoading(false);
     }
@@ -62,9 +59,7 @@ function Wishlist() {
       }
     } catch (err) {
       console.error("Remove wishlist item error:", err);
-      setError(
-        err.response?.data?.message || "Could not remove item."
-      );
+      setError(err.response?.data?.message || "Could not remove item.");
     } finally {
       setBusyItemId(null);
     }
@@ -82,9 +77,7 @@ function Wishlist() {
       }
 
       if (item.stock < item.quantity) {
-        setError(
-          `Only ${item.stock} item(s) are currently in stock.`
-        );
+        setError(`Only ${item.stock} item(s) are currently in stock.`);
         return;
       }
 
@@ -99,14 +92,14 @@ function Wishlist() {
         setMessage("Item moved to cart successfully.");
       } else {
         setError(
-          "Item was added to cart, but could not be removed from wishlist."
+          "Item was added to cart, but could not be removed from wishlist.",
         );
       }
     } catch (err) {
       console.error("Move to cart error:", err);
       setError(
         err.response?.data?.message ||
-          "Could not move item to cart. Please try again."
+          "Could not move item to cart. Please try again.",
       );
     } finally {
       setBusyItemId(null);
@@ -139,13 +132,9 @@ function Wishlist() {
         </div>
       </div>
 
-      {message && (
-        <p className="wishlist-message">{message}</p>
-      )}
+      {message && <p className="wishlist-message">{message}</p>}
 
-      {error && (
-        <p className="wishlist-error">{error}</p>
-      )}
+      {error && <p className="wishlist-error">{error}</p>}
 
       {items.length === 0 ? (
         <div className="wishlist-empty">
@@ -153,26 +142,18 @@ function Wishlist() {
           <h2>Your wishlist is empty</h2>
           <p>Save your favourite footwear here.</p>
 
-          <button
-            type="button"
-            onClick={() => navigate("/products")}
-          >
+          <button type="button" onClick={() => navigate("/products")}>
             Explore Products
           </button>
         </div>
       ) : (
         <div className="wishlist-grid">
           {items.map((item) => (
-            <article
-              className="wishlist-card"
-              key={item._id}
-            >
+            <article className="wishlist-card" key={item._id}>
               <button
                 type="button"
                 className="wishlist-product-image"
-                onClick={() =>
-                  navigate(`/products/${item.product?._id}`)
-                }
+                onClick={() => navigate(`/products/${item.product?._id}`)}
                 aria-label={`View ${item.product?.name || "product"}`}
               >
                 {item.image ? (
@@ -181,14 +162,30 @@ function Wishlist() {
                     alt={item.product?.name || "Footwear"}
                   />
                 ) : (
-                  <div className="wishlist-no-image">
-                    No image available
-                  </div>
+                  <div className="wishlist-no-image">No image available</div>
                 )}
               </button>
 
               <div className="wishlist-card-content">
-                <h3>{item.product?.name || "Product"}</h3>
+                <h3>{item.product?.name || "Product no longer available"}</h3>
+
+                {item.availability === "unavailable" && (
+                  <p className="wishlist-error" role="alert">
+                    Product not available
+                  </p>
+                )}
+
+                {item.availability === "out_of_stock" && (
+                  <p className="wishlist-stock">
+                    This product is out of stock.
+                  </p>
+                )}
+
+                {item.availability === "insufficient_stock" && (
+                  <p className="wishlist-error" role="alert">
+                    {item.unavailableReason}
+                  </p>
+                )}
 
                 <p>Color: {item.color || "N/A"}</p>
                 <p>Size: {item.size || "N/A"}</p>
@@ -198,9 +195,7 @@ function Wishlist() {
                 </p>
 
                 <p className="wishlist-stock">
-                  {item.stock > 0
-                    ? `${item.stock} available`
-                    : "Out of stock"}
+                  {item.stock > 0 ? `${item.stock} available` : "Out of stock"}
                 </p>
 
                 <div className="wishlist-actions">
@@ -209,6 +204,7 @@ function Wishlist() {
                     className="wishlist-move-btn"
                     disabled={
                       busyItemId === item._id ||
+                      item.availability !== "available" ||
                       !(item.stock > 0) ||
                       item.quantity > item.stock
                     }

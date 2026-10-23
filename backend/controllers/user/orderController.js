@@ -5,13 +5,15 @@ const Address = require("../../models/Address");
 const Cart = require("../../models/Cart");
 const Variant = require("../../models/Variant");
 const Coupon = require("../../models/Coupon");
+const Wallet = require("../../models/Wallet");
+const Product = require("../../models/Product");
+
 const { getCart } = require("../../services/user/cartService");
 const {
     getVariantPricing,
 } = require("../../services/user/offerPricingService");
 
-const Wallet = require("../../models/Wallet");
-const Product = require("../../models/Product");
+// ================= CREATE ORDER =================
 
 const createOrder = async (req, res) => {
     let reservedCouponId = null;
@@ -21,9 +23,19 @@ const createOrder = async (req, res) => {
     let walletBalanceAfterDebit = null;
     let totalAmount = 0;
 
-    try {
-        const { addressId, paymentMethod, couponCode } = req.body;
+    // Track stock deducted during checkout so it can be restored
+    // if order creation fails.
+    const reservedStock = [];
 
+    try {
+        const {
+            addressId,
+            paymentMethod,
+            couponCode,
+            buyNowVariantId,
+        } = req.body;
+
+        // Validate delivery address ID.
         if (!mongoose.isValidObjectId(addressId)) {
             return res.status(400).json({
                 success: false,
@@ -31,6 +43,7 @@ const createOrder = async (req, res) => {
             });
         }
 
+        // Validate payment method.
         if (!["COD", "UPI", "WALLET"].includes(paymentMethod)) {
             return res.status(400).json({
                 success: false,
@@ -38,6 +51,7 @@ const createOrder = async (req, res) => {
             });
         }
 
+        // Ensure the address belongs to the logged-in customer.
         const address = await Address.findOne({
             _id: addressId,
             userId: req.userId,
@@ -50,20 +64,80 @@ const createOrder = async (req, res) => {
             });
         }
 
-        const cart = await getCart(req.userId);
+        // ================= BUY NOW OR CART CHECKOUT =================
 
-        if (!cart || !cart.items || cart.items.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Your cart is empty",
+        let checkoutItems = [];
+        const isBuyNow = Boolean(buyNowVariantId);
+
+        if (isBuyNow) {
+            // Validate the selected variant ID.
+            if (!mongoose.isValidObjectId(buyNowVariantId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Please select a valid product variant",
+                });
+            }
+
+            // Find an active variant with available stock.
+            const variant = await Variant.findOne({
+                _id: buyNowVariantId,
+                isActive: true,
+                stock: { $gt: 0 },
             });
+
+            if (!variant) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "This product variant is unavailable or out of stock",
+                });
+            }
+
+            // Verify that the associated product is active.
+            const product = await Product.findOne({
+                _id: variant.productId,
+                isActive: true,
+            });
+
+            if (!product) {
+                return res.status(400).json({
+                    success: false,
+                    message: "This product is unavailable",
+                });
+            }
+
+            // Buy Now always orders one unit of the selected variant.
+            // The customer's cart remains unchanged.
+            checkoutItems = [
+                {
+                    variantId: variant._id,
+                    product,
+                    color: variant.color,
+                    size: variant.size,
+                    image: variant.mainImage || "",
+                    quantity: 1,
+                },
+            ];
+        } else {
+            // Normal checkout uses the existing cart.
+            const cart = await getCart(req.userId);
+
+            if (!cart || !cart.items || cart.items.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Your cart is empty",
+                });
+            }
+
+            checkoutItems = cart.items;
         }
+
+        // ================= VALIDATE ITEMS AND PRICES =================
 
         const orderItems = [];
         let subtotal = 0;
 
-        // Validate cart items and calculate current offer prices.
-        for (const item of cart.items) {
+        for (const item of checkoutItems) {
             if (
                 !item.variantId ||
                 !mongoose.isValidObjectId(item.variantId) ||
@@ -77,22 +151,20 @@ const createOrder = async (req, res) => {
                 });
             }
 
+            // Recheck the variant and its stock before creating the order.
             const variant = await Variant.findOne({
                 _id: item.variantId,
                 isActive: true,
             });
 
-            if (
-                !variant ||
-                variant.stock < Number(item.quantity)
-            ) {
+            if (!variant || variant.stock < Number(item.quantity)) {
                 return res.status(400).json({
                     success: false,
-                    message: `Insufficient stock for ${item.product.name
-                        }`,
+                    message: `Insufficient stock for ${item.product.name}`,
                 });
             }
 
+            // Calculate the current effective price on the server.
             const pricing = await getVariantPricing(
                 variant,
                 item.product
@@ -138,7 +210,8 @@ const createOrder = async (req, res) => {
         let discount = 0;
         let validatedCouponCode = null;
 
-        // Validate and reserve coupon usage.
+        // ================= VALIDATE AND RESERVE COUPON =================
+
         if (couponCode && String(couponCode).trim()) {
             const normalizedCode = String(couponCode)
                 .trim()
@@ -202,6 +275,7 @@ const createOrder = async (req, res) => {
                     Math.min(subtotal, Math.max(0, discount)) * 100
                 ) / 100;
 
+            // Atomically reserve one use of this coupon.
             const reservedCoupon = await Coupon.findOneAndUpdate(
                 {
                     _id: coupon._id,
@@ -235,6 +309,7 @@ const createOrder = async (req, res) => {
             validatedCouponCode = reservedCoupon.code;
         }
 
+        // Calculate the final payable amount.
         totalAmount = Math.max(
             0,
             Math.round(
@@ -242,10 +317,7 @@ const createOrder = async (req, res) => {
             ) / 100
         );
 
-        // Wallet payment: deduct funds atomically so concurrent
-        // requests cannot spend more than the available balance.
-        // Wallet payment: deduct the balance and record the debit
-        // in one atomic MongoDB update.
+        // ================= WALLET PAYMENT =================
 
         if (paymentMethod === "WALLET") {
             walletDebitTransactionId =
@@ -253,7 +325,6 @@ const createOrder = async (req, res) => {
                     .toString(36)
                     .slice(2, 10)}`;
 
-            // Atomically deduct the balance only when sufficient funds exist.
             const wallet = await Wallet.findOne({
                 userId: req.userId,
                 balance: { $gte: totalAmount },
@@ -268,7 +339,9 @@ const createOrder = async (req, res) => {
                             _id: reservedCouponId,
                             usedCount: { $gt: 0 },
                         },
-                        { $inc: { usedCount: -1 } }
+                        {
+                            $inc: { usedCount: -1 },
+                        }
                     );
 
                     reservedCouponId = null;
@@ -293,8 +366,7 @@ const createOrder = async (req, res) => {
                 (balanceBefore - totalAmount).toFixed(2)
             );
 
-            // Conditional update prevents spending funds that have already
-            // been used by another concurrent checkout.
+            // Deduct funds only if the current balance is still sufficient.
             const updatedWallet = await Wallet.findOneAndUpdate(
                 {
                     _id: wallet._id,
@@ -326,7 +398,9 @@ const createOrder = async (req, res) => {
                             _id: reservedCouponId,
                             usedCount: { $gt: 0 },
                         },
-                        { $inc: { usedCount: -1 } }
+                        {
+                            $inc: { usedCount: -1 },
+                        }
                     );
 
                     reservedCouponId = null;
@@ -351,6 +425,47 @@ const createOrder = async (req, res) => {
         }
 
 
+        // ================= RESERVE PRODUCT STOCK =================
+
+        // Deduct stock atomically to prevent overselling.
+        for (const item of orderItems) {
+            const quantity = Number(item.quantity);
+
+            const updatedVariant = await Variant.findOneAndUpdate(
+                {
+                    _id: item.variantId,
+                    isActive: true,
+                    stock: { $gte: quantity },
+                },
+                {
+                    $inc: { stock: -quantity },
+                },
+                {
+                    new: true,
+                }
+            );
+
+
+
+
+            if (!updatedVariant) {
+                const stockError = new Error(
+                    `Insufficient stock for ${item.productName}. Please refresh and try again.`
+                );
+                stockError.statusCode = 400;
+                throw stockError;
+            }
+
+            // Record each deduction for rollback if checkout fails.
+            reservedStock.push({
+                variantId: item.variantId,
+                quantity,
+            });
+        }
+
+
+        // ================= CREATE ORDER =================
+
         const order = await Order.create({
             orderNumber: `SS-${Date.now()}-${Math.floor(
                 1000 + Math.random() * 9000
@@ -374,12 +489,19 @@ const createOrder = async (req, res) => {
             paymentMethod,
             paymentStatus:
                 paymentMethod === "WALLET" ? "Paid" : "Pending",
+
+            // UPI payment window: 15 minutes from order creation.
+            razorpayPaymentExpiresAt:
+                paymentMethod === "UPI"
+                    ? new Date(Date.now() + 15 * 60 * 1000)
+                    : null,
+
             orderStatus: "Placed",
         });
 
         orderCreated = true;
 
-        // Link the wallet transaction to its created order.
+        // Link the wallet transaction to the new order.
         if (
             paymentMethod === "WALLET" &&
             walletDebitTransactionId
@@ -398,7 +520,6 @@ const createOrder = async (req, res) => {
                     }
                 );
             } catch (transactionError) {
-                // Do not undo an already-created, paid order.
                 console.error(
                     "Failed to link wallet transaction to order:",
                     transactionError
@@ -406,25 +527,27 @@ const createOrder = async (req, res) => {
             }
         }
 
-        // Clear the cart after the order is created.
-        try {
-            const userCart = await Cart.findOne({
-                userId: req.userId,
-            });
+        // Clear the cart immediately only for COD and Wallet.
+        // For UPI, keep it until Razorpay payment is verified.
+        if (!isBuyNow && paymentMethod !== "UPI") {
+            try {
+                const userCart = await Cart.findOne({
+                    userId: req.userId,
+                });
 
-            if (userCart) {
-                userCart.items = [];
-                await userCart.save();
+                if (userCart) {
+                    userCart.items = [];
+                    await userCart.save();
+                }
+            } catch (cartError) {
+                console.error(
+                    "Order created, but cart cleanup failed:",
+                    cartError
+                );
             }
-        } catch (cartError) {
-            // The order already exists. Avoid reporting that the
-            // payment failed merely because cart cleanup failed.
-            console.error(
-                "Order created, but cart cleanup failed:",
-                cartError
-            );
         }
 
+        // Return success for both checkout methods.
         return res.status(201).json({
             success: true,
             message:
@@ -443,9 +566,33 @@ const createOrder = async (req, res) => {
     } catch (error) {
         console.error("Create order error:", error);
 
-        // Restore wallet funds only if the order was not created.
+
+        // Restore stock if checkout failed before the order was created.
+        if (!orderCreated && reservedStock.length > 0) {
+            for (const reserved of reservedStock) {
+                try {
+                    await Variant.updateOne(
+                        { _id: reserved.variantId },
+                        { $inc: { stock: reserved.quantity } }
+                    );
+                } catch (stockError) {
+                    console.error(
+                        "CRITICAL: Failed to restore reserved stock:",
+                        stockError
+                    );
+                }
+            }
+        }
+
+
+        // Restore wallet funds if order creation failed after debit.
         if (walletDebited && !orderCreated) {
             try {
+                const rollbackTransactionId =
+                    `ROLLBACK-${Date.now()}-${Math.random()
+                        .toString(36)
+                        .slice(2, 10)}`;
+
                 const wallet = await Wallet.findOneAndUpdate(
                     {
                         userId: req.userId,
@@ -466,12 +613,8 @@ const createOrder = async (req, res) => {
                                     "Refund for unsuccessful order creation",
                                 referenceType: "Adjustment",
                                 referenceId: null,
-                                // Corrected below using the resulting balance.
                                 balanceAfter: 0,
-                                transactionId:
-                                    `ROLLBACK-${Date.now()}-${Math.random()
-                                        .toString(36)
-                                        .slice(2, 10)}`,
+                                transactionId: rollbackTransactionId,
                             },
                         },
                     },
@@ -483,12 +626,17 @@ const createOrder = async (req, res) => {
                         "CRITICAL: Wallet rollback could not find the original debit."
                     );
                 } else {
-                    // Update the rollback transaction with the resulting balance.
                     const rollbackTransaction =
-                        wallet.transactions[wallet.transactions.length - 1];
+                        wallet.transactions.find(
+                            (transaction) =>
+                                transaction.transactionId ===
+                                rollbackTransactionId
+                        );
 
                     if (rollbackTransaction) {
-                        rollbackTransaction.balanceAfter = wallet.balance;
+                        rollbackTransaction.balanceAfter =
+                            wallet.balance;
+
                         await wallet.save();
                     }
                 }
@@ -500,7 +648,7 @@ const createOrder = async (req, res) => {
             }
         }
 
-        // Release coupon reservation if order creation failed.
+        // Release reserved coupon usage if no order was created.
         if (reservedCouponId && !orderCreated) {
             try {
                 await Coupon.updateOne(
@@ -520,12 +668,16 @@ const createOrder = async (req, res) => {
             }
         }
 
-        return res.status(500).json({
+        return res.status(error.statusCode || 500).json({
             success: false,
-            message: "Failed to place order",
+            message: error.statusCode
+                ? error.message
+                : "Failed to place order",
         });
     }
 };
+
+// ================= GET CUSTOMER ORDERS =================
 
 const getMyOrders = async (req, res) => {
     try {
@@ -547,6 +699,10 @@ const getMyOrders = async (req, res) => {
     }
 };
 
+// ================= RETURN / EXCHANGE REQUEST =================
+
+
+
 const requestReturnExchange = async (req, res) => {
     try {
         const {
@@ -555,9 +711,9 @@ const requestReturnExchange = async (req, res) => {
             type,
             reason,
             replacementVariantId,
+            quantity = 1,
         } = req.body;
 
-        // Validate order ID.
         if (!mongoose.isValidObjectId(orderId)) {
             return res.status(400).json({
                 success: false,
@@ -565,37 +721,35 @@ const requestReturnExchange = async (req, res) => {
             });
         }
 
-        // Validate order item index.
+        const index = Number(itemIndex);
+        const requestedQuantity = Number(quantity);
+
         if (
-            !Number.isInteger(itemIndex) ||
-            itemIndex < 0
+            !Number.isInteger(index) ||
+            index < 0 ||
+            !Number.isInteger(requestedQuantity) ||
+            requestedQuantity < 1
         ) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid order item",
+                message: "Select a valid item and quantity",
             });
         }
 
-        // Validate request type.
         if (!["Return", "Exchange"].includes(type)) {
             return res.status(400).json({
                 success: false,
-                message: "Select Return or Exchange",
+                message: "Invalid request type",
             });
         }
 
-        // Validate reason.
-        if (
-            typeof reason !== "string" ||
-            !reason.trim()
-        ) {
+        if (typeof reason !== "string" || !reason.trim()) {
             return res.status(400).json({
                 success: false,
                 message: "Please provide a reason",
             });
         }
 
-        // Find the order belonging to the logged-in customer.
         const order = await Order.findOne({
             _id: orderId,
             userId: req.userId,
@@ -608,54 +762,40 @@ const requestReturnExchange = async (req, res) => {
             });
         }
 
-        // Only delivered orders can be returned or exchanged.
-        if (order.orderStatus !== "Delivered") {
+        if (index >= order.items.length) {
             return res.status(400).json({
                 success: false,
-                message:
-                    "Return or exchange is available only for delivered orders",
+                message: "Invalid order item",
             });
         }
 
-        if (!order.deliveredAt) {
+        if (
+            order.orderStatus !== "Delivered" ||
+            !order.deliveredAt
+        ) {
             return res.status(400).json({
                 success: false,
-                message:
-                    "Delivery date is unavailable for this order. Please contact support.",
+                message: "Returns and exchanges are available after delivery",
             });
         }
 
-        // Return window: 7 days.
-        // Exchange window: 10 days.
-        const allowedDays = type === "Return" ? 7 : 10;
-
-        const deliveryDate = new Date(order.deliveredAt);
-        deliveryDate.setHours(0, 0, 0, 0);
-
-        const deadline = new Date(deliveryDate);
-        deadline.setDate(
-            deadline.getDate() + allowedDays
-        );
-        deadline.setHours(23, 59, 59, 999);
+        const deadlineDays = type === "Return" ? 7 : 10;
+        const deadline = new Date(order.deliveredAt);
+        deadline.setDate(deadline.getDate() + deadlineDays);
 
         if (new Date() > deadline) {
             return res.status(400).json({
                 success: false,
-                message: `${type} window has expired. ${type} requests must be made within ${allowedDays} days of delivery.`,
+                message:
+                    type === "Return"
+                        ? "The 7-day return window has expired"
+                        : "The 10-day exchange window has expired",
             });
         }
 
-        // Get the selected item from the order.
-        const item = order.items[itemIndex];
+        const item = order.items[index];
 
-        if (!item) {
-            return res.status(404).json({
-                success: false,
-                message: "Order item not found",
-            });
-        }
-
-        // Prevent another request for the same item.
+        // Prevent mixing legacy requests with the new quantity workflow.
         if (
             item.returnExchange &&
             item.returnExchange.status !== "Not Requested"
@@ -663,174 +803,154 @@ const requestReturnExchange = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message:
-                    "A return or exchange request already exists for this item",
+                    "This item has an older return/exchange request. Please resolve it first.",
             });
         }
 
-        let replacementVariant = null;
-        let replacementPrice = null;
+        const completedQuantity =
+            Number(item.cancelledQuantity || 0) +
+            Number(item.returnedQuantity || 0) +
+            Number(item.exchangedQuantity || 0);
 
-        // ================= EXCHANGE VALIDATION =================
+        const pendingQuantity = (
+            item.itemActionRequests || []
+        )
+            .filter(
+                (request) =>
+                    !["Rejected", "Completed"].includes(request.status)
+            )
+            .reduce(
+                (total, request) =>
+                    total + Number(request.quantity || 0),
+                0
+            );
+
+        const availableQuantity = Math.max(
+            0,
+            Number(item.quantity) -
+            completedQuantity -
+            pendingQuantity
+        );
+
+        if (requestedQuantity > availableQuantity) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    `Only ${availableQuantity} unit(s) are available for a new request`,
+            });
+        }
+
+        let replacement = null;
 
         if (type === "Exchange") {
-            // A replacement variant is required.
-            if (
-                !replacementVariantId ||
-                !mongoose.isValidObjectId(
-                    replacementVariantId
-                )
-            ) {
+            if (!mongoose.isValidObjectId(replacementVariantId)) {
                 return res.status(400).json({
                     success: false,
-                    message:
-                        "Please select a valid replacement size and color.",
+                    message: "Please select a replacement variant",
                 });
             }
 
-            // Replacement must belong to the original product,
-            // be active, and have stock available.
-            replacementVariant = await Variant.findOne({
+            // The original variant is allowed too. This supports
+            // replacing a damaged shoe with the same color and size.
+            replacement = await Variant.findOne({
                 _id: replacementVariantId,
                 productId: item.productId,
                 isActive: true,
-                stock: { $gt: 0 },
+                stock: { $gte: requestedQuantity },
             });
 
-            if (!replacementVariant) {
+            if (!replacement) {
                 return res.status(400).json({
                     success: false,
                     message:
-                        "The selected replacement is unavailable. Please choose another size or color.",
+                        "The selected replacement is unavailable or has insufficient stock",
                 });
             }
 
-            // Do not allow the customer to exchange for the
-            // exact same variant.
-            if (
-                String(replacementVariant._id) ===
-                String(item.variantId)
-            ) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        "Please select a different size or color for your exchange.",
-                });
-            }
-
-            // Fetch the original product to calculate the
-            // replacement's effective price using the same
-            // offer-pricing logic used during checkout.
-            const product = await Product.findById(
-                item.productId
-            );
+            const product = await Product.findOne({
+                _id: item.productId,
+                isActive: true,
+            });
 
             if (!product) {
                 return res.status(400).json({
                     success: false,
-                    message:
-                        "The original product could not be found. Please contact support.",
+                    message: "This product is no longer available",
                 });
             }
 
-            const replacementPricing =
-                await getVariantPricing(
-                    replacementVariant,
+            // Only a different variant needs price comparison.
+            // Same-variant replacement does not require a new selection.
+            if (
+                String(replacement._id) !== String(item.variantId)
+            ) {
+                const pricing = await getVariantPricing(
+                    replacement,
                     product
                 );
 
-            replacementPrice = Number(
-                replacementPricing.price
-            );
+                const replacementPrice = Number(
+                    Number(pricing.price).toFixed(2)
+                );
 
-            // item.price is the effective per-item price
-            // saved when the original order was placed.
-            const originalItemPrice = Number(item.price);
+                const originalPrice = Number(
+                    Number(item.price).toFixed(2)
+                );
 
-            if (
-                !Number.isFinite(originalItemPrice) ||
-                !Number.isFinite(replacementPrice) ||
-                originalItemPrice < 0 ||
-                replacementPrice < 0
-            ) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        "Unable to verify the replacement price. Please try again or contact support.",
-                });
-            }
-
-            // Compare prices to the nearest paise.
-            const originalPriceInPaise = Math.round(
-                originalItemPrice * 100
-            );
-
-            const replacementPriceInPaise = Math.round(
-                replacementPrice * 100
-            );
-
-            if (
-                originalPriceInPaise !==
-                replacementPriceInPaise
-            ) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        "The selected replacement has a different price from your original purchase. Please return this item and place a new order for your preferred size or color.",
-                });
+                if (replacementPrice !== originalPrice) {
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            "This replacement has a different price. Please return the item and place a new order instead.",
+                    });
+                }
             }
         }
 
-        // ================= SAVE REQUEST =================
-
-        item.returnExchange = {
+        item.itemActionRequests.push({
             type,
+            quantity: requestedQuantity,
             reason: reason.trim(),
             status: "Requested",
             requestedAt: new Date(),
-
             replacementVariantId:
-                type === "Exchange"
-                    ? replacementVariant._id
-                    : null,
-
+                type === "Exchange" ? replacement._id : null,
             replacementColor:
-                type === "Exchange"
-                    ? replacementVariant.color
-                    : "",
-
+                type === "Exchange" ? replacement.color : "",
             replacementSize:
-                type === "Exchange"
-                    ? replacementVariant.size
-                    : null,
-        };
+                type === "Exchange" ? replacement.size : null,
+        });
 
         await order.save();
 
-        return res.status(200).json({
+        const savedRequest =
+            item.itemActionRequests[
+            item.itemActionRequests.length - 1
+            ];
+
+        return res.status(201).json({
             success: true,
             message:
-                type === "Exchange"
-                    ? "Exchange request submitted successfully"
-                    : "Return request submitted successfully",
-            order,
+                `${type} request submitted for ${requestedQuantity} unit(s)`,
+            request: savedRequest,
         });
     } catch (error) {
-        console.error(
-            "Return/exchange request error:",
-            error
-        );
+        console.error("Request return/exchange error:", error);
 
         return res.status(500).json({
             success: false,
-            message:
-                "Failed to submit return/exchange request",
+            message: "Failed to submit return/exchange request",
         });
     }
 };
 
+
+// ================= CANCEL ORDER =================
 const cancelOrder = async (req, res) => {
+    const session = await mongoose.startSession();
+
     try {
-        const { orderId } = req.body;
+        const { orderId, itemIndex } = req.body;
 
         if (!mongoose.isValidObjectId(orderId)) {
             return res.status(400).json({
@@ -839,42 +959,256 @@ const cancelOrder = async (req, res) => {
             });
         }
 
-        const order = await Order.findOne({
-            _id: orderId,
-            userId: req.userId,
-        });
+        const index = Number(itemIndex);
 
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: "Order not found",
-            });
-        }
-
-        if (!["Placed", "Confirmed"].includes(order.orderStatus)) {
+        if (!Number.isInteger(index) || index < 0) {
             return res.status(400).json({
                 success: false,
-                message: "Orders can only be cancelled before shipping",
+                message: "Select a valid product",
             });
         }
 
-        order.orderStatus = "Cancelled";
-        await order.save();
+        let responseData;
 
-        return res.status(200).json({
-            success: true,
-            message: "Order cancelled successfully",
-            order,
+        await session.withTransaction(async () => {
+            // Always read the latest order inside the transaction.
+            const order = await Order.findOne({
+                _id: orderId,
+                userId: req.userId,
+            }).session(session);
+
+            if (!order) {
+                const error = new Error("Order not found");
+                error.statusCode = 404;
+                throw error;
+            }
+
+            if (!["Placed", "Confirmed"].includes(order.orderStatus)) {
+                const error = new Error(
+                    "Products can only be cancelled before shipping"
+                );
+                error.statusCode = 400;
+                throw error;
+            }
+
+            if (index >= order.items.length) {
+                const error = new Error("Invalid order product");
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const item = order.items[index];
+
+
+
+            // Do not allow cancellation when an older return/exchange
+            // request for this product is still active.
+            const oldRequestStatus = item.returnExchange?.status;
+
+            if (
+                oldRequestStatus &&
+                oldRequestStatus !== "Not Requested" &&
+                oldRequestStatus !== "Rejected"
+            ) {
+                const error = new Error(
+                    "This product already has a return/exchange request"
+                );
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const alreadyCancelled = Number(item.cancelledQuantity || 0);
+            const alreadyReturned = Number(item.returnedQuantity || 0);
+            const alreadyExchanged = Number(item.exchangedQuantity || 0);
+
+            // Count quantities reserved by requests that are still active.
+            const pendingActionQuantity = (
+                item.itemActionRequests || []
+            )
+                .filter((request) =>
+                    !["Rejected", "Completed"].includes(request.status)
+                )
+                .reduce(
+                    (total, request) =>
+                        total + Number(request.quantity || 0),
+                    0
+                );
+
+            // Cancel every remaining available unit on this product line.
+            const cancelQuantity = Math.max(
+                0,
+                Number(item.quantity || 0) -
+                alreadyCancelled -
+                alreadyReturned -
+                alreadyExchanged -
+                pendingActionQuantity
+            );
+
+            if (cancelQuantity <= 0) {
+                const error = new Error(
+                    "This product has no remaining quantity available to cancel"
+                );
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const variant = await Variant.findById(item.variantId)
+                .session(session);
+
+            if (!variant) {
+                const error = new Error("Product variant not found");
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const unitPrice = Number(item.price || 0);
+            const grossAmount = unitPrice * cancelQuantity;
+
+            // Allocate the order-level discount proportionally.
+            // This assumes order.discount contains the order-level
+            // discount, while item.price already reflects product offers.
+            const orderDiscount = Number(order.discount || 0);
+            const orderSubtotal = Number(order.subtotal || 0);
+
+            const discountShare =
+                orderSubtotal > 0
+                    ? orderDiscount * (grossAmount / orderSubtotal)
+                    : 0;
+
+            const refundAmount = Math.max(
+                0,
+                Math.round((grossAmount - discountShare) * 100) / 100
+            );
+
+            const isPaid = order.paymentStatus === "Paid";
+
+            const transactionId =
+                `CANCEL-${order._id}-${index}-${alreadyCancelled + cancelQuantity}`;
+
+            // Restore stock and update cancellation quantity within
+            // the same transaction.
+            variant.stock =
+                Number(variant.stock || 0) + cancelQuantity;
+
+            await variant.save({ session });
+
+            item.cancelledQuantity =
+                alreadyCancelled + cancelQuantity;
+
+            // Refund only payments that have actually been received.
+            if (isPaid && refundAmount > 0) {
+                let wallet = await Wallet.findOne({
+                    userId: req.userId,
+                }).session(session);
+
+                if (!wallet) {
+                    wallet = new Wallet({
+                        userId: req.userId,
+                        balance: 0,
+                        transactions: [],
+                    });
+                }
+
+                // Extra protection against crediting the same refund twice.
+                const refundAlreadyExists = (
+                    wallet.transactions || []
+                ).some(
+                    (transaction) =>
+                        transaction.transactionId === transactionId
+                );
+
+                if (refundAlreadyExists) {
+                    const error = new Error(
+                        "This cancellation refund has already been processed"
+                    );
+                    error.statusCode = 409;
+                    throw error;
+                }
+
+                const newBalance = Number(
+                    (
+                        Number(wallet.balance || 0) + refundAmount
+                    ).toFixed(2)
+                );
+
+                wallet.balance = newBalance;
+
+                wallet.transactions.push({
+                    type: "Credit",
+                    amount: refundAmount,
+                    description:
+                        `Refund for cancelled ${item.productName} ` +
+                        `in order ${order.orderNumber}`,
+                    referenceType: "Refund",
+                    referenceId: order._id,
+                    balanceAfter: newBalance,
+                    transactionId,
+                });
+
+                await wallet.save({ session });
+
+                order.refundAmount = Math.round(
+                    (
+                        Number(order.refundAmount || 0) +
+                        refundAmount
+                    ) * 100
+                ) / 100;
+
+                order.refundedAt = new Date();
+            }
+
+            // Cancel the entire order only when all originally ordered
+            // units have been cancelled.
+            const totalCancelled = order.items.reduce(
+                (total, currentItem) =>
+                    total +
+                    Number(currentItem.cancelledQuantity || 0),
+                0
+            );
+
+            const totalOrdered = order.items.reduce(
+                (total, currentItem) =>
+                    total + Number(currentItem.quantity || 0),
+                0
+            );
+
+            if (totalCancelled >= totalOrdered) {
+                order.orderStatus = "Cancelled";
+
+                if (isPaid) {
+                    order.paymentStatus = "Refunded";
+                }
+            }
+
+            await order.save({ session });
+
+            responseData = {
+                success: true,
+                message: isPaid
+                    ? `${item.productName} cancelled. Refund of ₹${refundAmount.toFixed(2)} credited to your wallet.`
+                    : `${item.productName} cancelled successfully.`,
+                order,
+                cancelledQuantity: cancelQuantity,
+                refundAmount: isPaid ? refundAmount : 0,
+            };
         });
+
+        return res.status(200).json(responseData);
     } catch (error) {
-        console.error("Cancel order error:", error);
+        console.error("Cancel product error:", error);
 
-        return res.status(500).json({
+        return res.status(error.statusCode || 500).json({
             success: false,
-            message: "Failed to cancel order",
+            message:
+                error.statusCode
+                    ? error.message
+                    : "Failed to cancel product",
         });
+    } finally {
+        await session.endSession();
     }
 };
+
 
 module.exports = {
     createOrder,

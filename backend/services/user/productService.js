@@ -6,6 +6,7 @@ const { getVariantPricing } = require("./offerPricingService");
 
 // ================= GET ACTIVE PRODUCTS =================
 
+
 const getActiveProducts = async ({
   search = "",
   categoryId = "",
@@ -20,31 +21,65 @@ const getActiveProducts = async ({
     isActive: true,
   };
 
-  // Search by product name
-  if (search.trim()) {
+  // Search by product name, ignoring uppercase/lowercase differences.
+  const searchText = search.trim();
+
+  if (searchText) {
+    const escapedSearch = searchText.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&"
+    );
+
     query.name = {
-      $regex: search.trim(),
+      $regex: escapedSearch,
       $options: "i",
     };
   }
 
-  // Get only products whose category is active
-  const activeCategories = await Category.find({
-    isActive: true,
-  }).select("_id");
+  // Only show products belonging to active categories.
+const activeCategories = await Category.find({
+  isActive: true,
+}).select("_id name");
 
-  const activeCategoryIds = activeCategories.map(
-    (category) => category._id
-  );
+const activeCategoryIds = activeCategories.map(
+  (category) => category._id
+);
 
+if (categoryId) {
+  const mongoose = require("mongoose");
+
+  let matchedCategory = null;
+
+  // If categoryId is a valid MongoDB ObjectId, match by ID.
+  if (mongoose.Types.ObjectId.isValid(categoryId)) {
+    matchedCategory = activeCategories.find(
+      (category) =>
+        category._id.toString() === categoryId
+    );
+  }
+
+  // Otherwise, match by category name, ignoring case.
+  if (!matchedCategory) {
+    matchedCategory = activeCategories.find(
+      (category) =>
+        category.name.trim().toLowerCase() ===
+        categoryId.trim().toLowerCase()
+    );
+  }
+
+  query.categoryId = matchedCategory
+    ? matchedCategory._id
+    : null;
+} else {
   query.categoryId = {
-    $in: categoryId ? [categoryId] : activeCategoryIds,
+    $in: activeCategoryIds,
   };
+}
 
-  // Count products
+  // Count matching products for pagination.
   const totalProducts = await Product.countDocuments(query);
 
-  // Get products
+  // Fetch the requested page.
   const products = await Product.find(query)
     .populate("categoryId", "name")
     .sort({ name: 1 })
@@ -52,7 +87,7 @@ const getActiveProducts = async ({
     .limit(limitNumber)
     .lean();
 
-  // Get active variants, including their prices
+  // Fetch active variants for the displayed products.
   const productIds = products.map((product) => product._id);
 
   const variants = await Variant.find({
@@ -63,7 +98,7 @@ const getActiveProducts = async ({
     .sort({ price: 1 })
     .lean();
 
-  // Add display image and offer pricing
+  // Preserve product images, variant prices, and offer pricing.
   const productsWithPricing = await Promise.all(
     products.map(async (product) => {
       const productVariants = variants.filter(
@@ -71,7 +106,6 @@ const getActiveProducts = async ({
           variant.productId.toString() === product._id.toString()
       );
 
-      // Use the lowest-priced active variant for the Shop card.
       const variant = productVariants[0] || null;
 
       const displayImage =
@@ -80,7 +114,6 @@ const getActiveProducts = async ({
         variant?.productImages?.[0] ||
         null;
 
-      // Use the product base price if no active variant exists.
       const pricing = await getVariantPricing(
         variant || { price: product.basePrice },
         product
@@ -89,8 +122,6 @@ const getActiveProducts = async ({
       return {
         ...product,
         displayImage,
-
-        // Price shown on the Shop page
         displayPrice: pricing.price,
         originalPrice: pricing.originalPrice,
         offerDiscount: pricing.offerDiscount,

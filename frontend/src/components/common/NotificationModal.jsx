@@ -1,49 +1,47 @@
 
-import React, { useEffect } from "react";
-import { CheckCircle, XCircle, Info } from "lucide-react";
-import "./NotificationModal.css";
+  import React, { useEffect } from "react";
+  import { CheckCircle, XCircle, Info } from "lucide-react";
+  import "./NotificationModal.css";
 
-function NotificationModal({
-  isOpen,
-  onClose,
-  title,
-  message,
-  type = "success",
-  duration = 2000,
-}) {
-  useEffect(() => {
+  function NotificationModal({
+    isOpen,
+    onClose,
+    title,
+    message,
+    type = "success",
+    duration = 2000,
+  }) {
+    useEffect(() => {
+  if (!isOpen) return;
+
+  const timer = setTimeout(() => {
+    onClose();
+  }, 2000);
+
+  return () => clearTimeout(timer);
+}, [isOpen]);
+
     if (!isOpen) {
-      return;
+      return null;
     }
 
-    const timer = setTimeout(() => {
-      onClose();
-    }, duration);
+    return (
+      <div className="notification-modal-overlay">
+        <div className="notification-modal">
 
-    return () => clearTimeout(timer);
-  }, [isOpen, onClose, duration]);
+          <div className={`notification-modal-icon ${type}`}>
+            {type === "success" && <CheckCircle size={50} />}
+            {type === "error" && <XCircle size={50} />}
+            {type === "info" && <Info size={50} />}
+          </div>
 
-  if (!isOpen) {
-    return null;
+          <h2>{title}</h2>
+
+          <p>{message}</p>
+
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <div className="notification-modal-overlay">
-      <div className="notification-modal">
-
-        <div className={`notification-modal-icon ${type}`}>
-          {type === "success" && <CheckCircle size={50} />}
-          {type === "error" && <XCircle size={50} />}
-          {type === "info" && <Info size={50} />}
-        </div>
-
-        <h2>{title}</h2>
-
-        <p>{message}</p>
-
-      </div>
-    </div>
-  );
-}
-
-export default NotificationModal;
+  export default NotificationModal;

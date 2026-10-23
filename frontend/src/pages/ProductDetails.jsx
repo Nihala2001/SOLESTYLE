@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { Heart, ArrowLeft } from "lucide-react";
-
+import { Heart, ArrowLeft, Star } from "lucide-react";
+import { getProductReviews } from "../api/services/userReviewService";
 import { getActiveProducts } from "../api/services/userProductService";
 import { getProductVariants } from "../api/services/userVariantService";
 import { addToCart } from "../api/services/userCartService";
@@ -25,6 +25,12 @@ function ProductDetails() {
 
   const [product, setProduct] = useState(null);
   const [variants, setVariants] = useState([]);
+
+  const [reviews, setReviews] = useState([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState("");
 
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState(null);
@@ -131,6 +137,48 @@ function ProductDetails() {
 
     fetchProduct();
   }, [productId, isExchangeMode, exchangeContext?.originalColor]);
+
+  // ================= FETCH PRODUCT REVIEWS =================
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchReviews = async () => {
+      setReviewsLoading(true);
+      setReviewsError("");
+
+      try {
+        const response = await getProductReviews(productId);
+
+        if (!isMounted) return;
+
+        setReviews(response.reviews || []);
+        setAverageRating(Number(response.averageRating) || 0);
+        setTotalReviews(Number(response.totalReviews) || 0);
+      } catch (error) {
+        if (!isMounted) return;
+
+        console.error("Failed to fetch product reviews:", error);
+
+        setReviews([]);
+        setAverageRating(0);
+        setTotalReviews(0);
+        setReviewsError("Unable to load reviews. Please try again later.");
+      } finally {
+        if (isMounted) {
+          setReviewsLoading(false);
+        }
+      }
+    };
+
+    if (productId) {
+      fetchReviews();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [productId]);
 
   // ================= COLORS =================
 
@@ -277,6 +325,66 @@ function ProductDetails() {
     }
   };
 
+  const handleBuyNow = () => {
+    // Buy Now is not part of the exchange flow.
+    if (isExchangeMode) {
+      return;
+    }
+
+    if (!selectedColor) {
+      showNotification(
+        "Select a Color",
+        "Please select a color first.",
+        "info",
+      );
+      return;
+    }
+
+    if (!selectedSize || !selectedVariant) {
+      showNotification(
+        "Select a Size",
+        "Please select a valid size first.",
+        "info",
+      );
+      return;
+    }
+
+    if (Number(selectedVariant.stock) <= 0) {
+      showNotification(
+        "Out of Stock",
+        "This size is currently out of stock.",
+        "error",
+      );
+      return;
+    }
+
+    navigate("/checkout", {
+      state: {
+        buyNowItem: {
+          variantId: selectedVariant._id,
+          product: {
+            _id: product._id,
+            name: product.name,
+          },
+          color: selectedVariant.color,
+          size: selectedVariant.size,
+          quantity: 1,
+          price: Number(pricingVariant?.price ?? selectedVariant.price),
+          originalPrice: Number(
+            pricingVariant?.originalPrice ?? selectedVariant.price,
+          ),
+          offerDiscount: Number(pricingVariant?.offerDiscount ?? 0),
+          image:
+            selectedVariant.mainImage ||
+            selectedColorVariant?.mainImage ||
+            currentImage ||
+            product.displayImage ||
+            product.images?.[0] ||
+            "",
+        },
+      },
+    });
+  };
   // ================= CONTINUE EXCHANGE =================
 
   const handleContinueExchange = () => {
@@ -688,8 +796,128 @@ function ProductDetails() {
               {addingToCart ? "Adding..." : "Add to Cart"}
             </button>
           )}
+
+          {!isExchangeMode && (
+            <button
+              type="button"
+              className="buy-now-button"
+              onClick={handleBuyNow}
+            >
+              Buy Now
+            </button>
+          )}
         </div>
       </div>
+
+      {/* ================= CUSTOMER REVIEWS ================= */}
+
+      <section className="product-reviews-section">
+        <div className="product-reviews-heading">
+          <div>
+            <h2>Customer Reviews</h2>
+            <p>See what our customers think about this product.</p>
+          </div>
+        </div>
+
+        {reviewsLoading ? (
+          <p className="reviews-message">Loading reviews...</p>
+        ) : reviewsError ? (
+          <p className="reviews-message reviews-error">{reviewsError}</p>
+        ) : (
+          <>
+            <div className="reviews-summary">
+              <div className="reviews-average">
+                <strong>{averageRating.toFixed(1)}</strong>
+
+                <div
+                  className="reviews-summary-stars"
+                  aria-label={`${averageRating} out of 5 stars`}
+                >
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      size={20}
+                      fill={
+                        star <= Math.round(averageRating)
+                          ? "currentColor"
+                          : "none"
+                      }
+                    />
+                  ))}
+                </div>
+
+                <span>
+                  {totalReviews} {totalReviews === 1 ? "review" : "reviews"}
+                </span>
+              </div>
+            </div>
+
+            {reviews.length === 0 ? (
+              <div className="reviews-empty">
+                <Star size={32} />
+                <h3>No reviews yet</h3>
+                <p>Be the first to share your experience with this product!</p>
+              </div>
+            ) : (
+              <div className="product-reviews-list">
+                {reviews.map((review) => (
+                  <article className="product-review-card" key={review._id}>
+                    <div className="product-review-top">
+                      <div className="product-review-customer">
+                        <div className="review-avatar">
+                          {(review.customerName || "C")
+                            .trim()
+                            .charAt(0)
+                            .toUpperCase()}
+                        </div>
+
+                        <div>
+                          <h3>{review.customerName || "Customer"}</h3>
+
+                          <p>
+                            {review.createdAt
+                              ? new Date(review.createdAt).toLocaleDateString(
+                                  "en-IN",
+                                  {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  },
+                                )
+                              : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div
+                        className="product-review-stars"
+                        aria-label={`${review.rating} out of 5 stars`}
+                      >
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            size={16}
+                            fill={
+                              star <= review.rating ? "currentColor" : "none"
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {review.title && (
+                      <h4 className="product-review-title">{review.title}</h4>
+                    )}
+
+                    <p className="product-review-comment">{review.comment}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
       {/* IMAGE VIEWER */}
 
       {isZoomed && currentImage && (

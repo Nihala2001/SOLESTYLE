@@ -1,144 +1,66 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
-import {
-  Mail,
-  Phone,
-  MapPin,
-} from "lucide-react";
+import { Mail, ArrowUpRight } from "lucide-react";
 import "./Footer.css";
 
 function Footer() {
   return (
     <footer className="footer">
-
       <div className="footer-container">
-
-        {/* ================= BRAND ================= */}
-
-        <div className="footer-section footer-brand">
-
-          <h2>SOLESTYLE</h2>
-
+        <div className="footer-brand">
+          <Link to="/home" className="footer-logo">
+            SOLESTYLE<span>.</span>
+          </Link>
           <p>
-            Step into your style with footwear
-            designed for every woman.
+            Find your perfect pair.
+            <br />
+            Walk with confidence.
           </p>
 
-          <div className="footer-social">
-
-            <a href="#" aria-label="Instagram">
-              Instagram
-            </a>
-
-            <a href="#" aria-label="Facebook">
-              Facebook
-            </a>
-
-            <a href="#" aria-label="Twitter">
-              Twitter
-            </a>
-
-          </div>
-
+          <a
+            href="https://www.instagram.com/"
+            target="_blank"
+            rel="noreferrer"
+            className="footer-social-link"
+          >
+            Follow our style
+            <ArrowUpRight size={14} />
+          </a>
         </div>
 
-
-        {/* ================= QUICK LINKS ================= */}
-
-        <div className="footer-section">
-
-          <h3>Quick Links</h3>
-
-          <Link to="/home">
-            Home
-          </Link>
-
-          <Link to="/products">
-            Shop
-          </Link>
-
-          <Link to="/wishlist">
-            Wishlist
-          </Link>
-
-          <Link to="/cart">
-            Cart
-          </Link>
-
+        <div className="footer-column">
+          <h3>Explore</h3>
+          <Link to="/home">Home</Link>
+          <Link to="/products">Shop All</Link>
+          <Link to="/about">About Us</Link>
+          <Link to="/wishlist">Wishlist</Link>
         </div>
 
-
-        {/* ================= CATEGORIES ================= */}
-
-        <div className="footer-section">
-
-          <h3>Categories</h3>
-
-          <Link to="/products?category=sneakers">
-            Sneakers
-          </Link>
-
-          <Link to="/products?category=heels">
-            Heels
-          </Link>
-
-          <Link to="/products?category=flats">
-            Flats
-          </Link>
-
+        <div className="footer-column">
+          <h3>Your Account</h3>
+          <Link to="/profile">My Profile</Link>
+          <Link to="/cart">Shopping Cart</Link>
+          <Link to="/profile">My Orders</Link>
         </div>
 
-
-        {/* ================= CONTACT ================= */}
-
-        <div className="footer-section">
-
-          <h3>Contact Us</h3>
-
-          <p>
+        <div className="footer-column footer-contact">
+          <h3>Need Help?</h3>
+          <p>We're here to help you find your perfect fit.</p>
+          <a href="mailto:support@solestyle.com">
             <Mail size={16} />
             support@solestyle.com
-          </p>
-
-          <p>
-            <Phone size={16} />
-            +91 98765 43210
-          </p>
-
-          <p>
-            <MapPin size={16} />
-            Kerala, India
-          </p>
-
+          </a>
         </div>
-
       </div>
-
-
-      {/* ================= FOOTER BOTTOM ================= */}
 
       <div className="footer-bottom">
+        <p>© {new Date().getFullYear()} SOLESTYLE. All rights reserved.</p>
 
-        <p>
-          © {new Date().getFullYear()} SOLESTYLE.
-          All rights reserved.
-        </p>
-
-        <div>
-
-          <Link to="/privacy-policy">
-            Privacy Policy
-          </Link>
-
-          <Link to="/terms">
-            Terms & Conditions
-          </Link>
-
+        <div className="footer-legal">
+          <Link to="/privacy-policy">Privacy Policy</Link>
+          <Link to="/terms">Terms & Conditions</Link>
         </div>
-
       </div>
-
     </footer>
   );
 }

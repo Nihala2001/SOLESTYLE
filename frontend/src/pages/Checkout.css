@@ -343,3 +343,28 @@
     height: 52px;
   }
 }
+
+
+.checkout-success-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+}
+
+.checkout-success-buttons .checkout-primary-button {
+    margin: 0;
+}
+
+@media (max-width: 480px) {
+    .checkout-success-buttons {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .checkout-success-buttons .checkout-primary-button {
+        width: 100%;
+    }
+}

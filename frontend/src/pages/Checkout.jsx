@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   MapPin,
   ShoppingBag,
@@ -10,15 +10,41 @@ import {
 
 import { getAddresses } from "../api/services/userService";
 import { getCart } from "../api/services/userCartService";
-import { createOrder } from "../api/services/userOrderService";
+import {
+  createOrder,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+} from "../api/services/userOrderService";
 import { getAvailableCoupons } from "../api/services/userCouponService";
 import { getWallet } from "../api/services/userWalletService";
 
 import NotificationModal from "../components/common/NotificationModal";
 import "./Checkout.css";
 
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+
+    document.body.appendChild(script);
+  });
+};
+
 function Checkout() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Present only when the customer clicked Buy Now.
+  const buyNowItem = location.state?.buyNowItem || null;
+  const isBuyNow = Boolean(buyNowItem);
 
   const [addresses, setAddresses] = useState([]);
   const [selectedAddress, setSelectedAddress] = useState("");
@@ -28,6 +54,8 @@ function Checkout() {
   const [loading, setLoading] = useState(true);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
+
+  const [pendingOnlineOrder, setPendingOnlineOrder] = useState(null);
 
   const [notification, setNotification] = useState({
     isOpen: false,
@@ -54,43 +82,57 @@ function Checkout() {
     });
   };
 
-  // ================= LOAD ADDRESSES AND CART =================
+  // ================= LOAD ADDRESSES AND CHECKOUT ITEMS =================
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadCheckout = async () => {
+      setLoading(true);
+
       try {
+        // Addresses are required for both checkout types.
+        // Only normal checkout needs to fetch the cart.
         const [addressResponse, cartResponse] = await Promise.all([
           getAddresses(),
-          getCart(),
+          isBuyNow ? Promise.resolve(null) : getCart(),
         ]);
 
+        if (!isMounted) return;
+
         const addressList = addressResponse.addresses || [];
-        const cartItems = cartResponse.cart?.items || [];
+
+        const checkoutItems = isBuyNow
+          ? [{ ...buyNowItem, quantity: 1 }]
+          : cartResponse?.cart?.items || [];
 
         setAddresses(addressList);
-        setItems(cartItems);
+        setItems(checkoutItems);
 
-        const defaultAddress = addressList.find(
-          (address) => address.isDefault,
-        );
+        const defaultAddress = addressList.find((address) => address.isDefault);
 
-        setSelectedAddress(
-          defaultAddress?._id || addressList[0]?._id || "",
-        );
+        setSelectedAddress(defaultAddress?._id || addressList[0]?._id || "");
       } catch (error) {
+        if (!isMounted) return;
+
         showNotification(
           "Unable to load checkout",
-          error.response?.data?.message ||
-            "Please log in and try again.",
+          error.response?.data?.message || "Please log in and try again.",
           "error",
         );
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     loadCheckout();
-  }, []);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [buyNowItem, isBuyNow]);
 
   // ================= LOAD WALLET =================
 
@@ -102,12 +144,9 @@ function Checkout() {
 
         const response = await getWallet();
 
-        setWalletBalance(
-          Number(response.wallet?.balance ?? 0),
-        );
+        setWalletBalance(Number(response.wallet?.balance ?? 0));
       } catch (error) {
         console.error("Failed to load wallet:", error);
-
         setWalletBalance(0);
         setWalletError(true);
       } finally {
@@ -142,8 +181,7 @@ function Checkout() {
 
   const subtotal = items.reduce(
     (total, item) =>
-      total +
-      Number(item.price || 0) * Number(item.quantity || 0),
+      total + Number(item.price || 0) * Number(item.quantity || 0),
     0,
   );
 
@@ -161,10 +199,7 @@ function Checkout() {
       )
     : 0;
 
-  const total = Math.max(
-    0,
-    subtotal - discount + shippingFee,
-  );
+  const total = Math.max(0, subtotal - discount + shippingFee);
 
   const hasSufficientWalletBalance = walletBalance >= total;
 
@@ -243,24 +278,22 @@ function Checkout() {
 
     if (items.length === 0) {
       showNotification(
-        "Your cart is empty",
-        "Add products to your cart before checking out.",
+        "No products to checkout",
+        "Please select a product or add products to your cart.",
         "error",
       );
       return;
     }
 
-    // UPI requires a verified payment-gateway integration.
-    if (paymentMethod === "UPI") {
+    if (isBuyNow && !buyNowItem?.variantId) {
       showNotification(
-        "UPI payment unavailable",
-        "UPI payment integration is not connected yet. Please choose Cash on Delivery or Wallet.",
-        "info",
+        "Unable to order product",
+        "The selected product variant is missing. Please return to the product page and try again.",
+        "error",
       );
       return;
     }
 
-    // Do not attempt wallet payment while its balance is unknown.
     if (paymentMethod === "WALLET") {
       if (walletLoading) {
         showNotification(
@@ -283,11 +316,7 @@ function Checkout() {
       if (!hasSufficientWalletBalance) {
         showNotification(
           "Insufficient wallet balance",
-          `Your wallet balance is ₹${walletBalance.toFixed(
-            2,
-          )}, but your order total is ₹${total.toFixed(
-            2,
-          )}. Please choose another payment method.`,
+          `Your wallet balance is ₹${walletBalance.toFixed(2)}, but your order total is ₹${total.toFixed(2)}.`,
           "error",
         );
         return;
@@ -297,29 +326,144 @@ function Checkout() {
     try {
       setPlacingOrder(true);
 
-      const response = await createOrder(
-        selectedAddress,
-        paymentMethod,
-        appliedCoupon?.code || null,
-      );
+      let order;
 
-      if (!response.success || !response.order) {
-        throw new Error(
-          response.message || "Failed to place order",
+      // Reuse an unpaid online order when retrying in this checkout session.
+      if (
+        paymentMethod === "UPI" &&
+        pendingOnlineOrder &&
+        pendingOnlineOrder.paymentStatus === "Pending"
+      ) {
+        order = pendingOnlineOrder;
+      } else {
+        const response = await createOrder(
+          selectedAddress,
+          paymentMethod,
+          appliedCoupon?.code || null,
+          isBuyNow ? buyNowItem.variantId : null,
         );
+
+        if (!response.success || !response.order) {
+          throw new Error(response.message || "Failed to place order");
+        }
+
+        order = response.order;
+
+        if (paymentMethod === "UPI") {
+          setPendingOnlineOrder(order);
+        }
       }
 
-      setCompletedOrder(response.order);
+      // ================= RAZORPAY PAYMENT =================
+
+      if (paymentMethod === "UPI") {
+        const scriptLoaded = await loadRazorpayScript();
+
+        if (!scriptLoaded) {
+          showNotification(
+            "Payment unavailable",
+            "Unable to load Razorpay Checkout. Please check your internet connection and retry.",
+            "error",
+          );
+          return;
+        }
+
+        const gatewayResponse = await createRazorpayOrder(order._id);
+
+        if (
+          !gatewayResponse.success ||
+          !gatewayResponse.razorpayOrder ||
+          !gatewayResponse.keyId
+        ) {
+          throw new Error(
+            gatewayResponse.message || "Unable to start Razorpay payment.",
+          );
+        }
+
+        const gatewayOrder = gatewayResponse.razorpayOrder;
+
+        const options = {
+          key: gatewayResponse.keyId,
+          amount: gatewayOrder.amount,
+          currency: gatewayOrder.currency,
+          name: "SOLESTYLE",
+          description: `Payment for order ${order.orderNumber}`,
+          order_id: gatewayOrder.id,
+          handler: async (paymentResponse) => {
+            try {
+              setPlacingOrder(true);
+
+              const verificationResponse = await verifyRazorpayPayment(
+                order._id,
+                paymentResponse,
+              );
+
+              if (
+                !verificationResponse.success ||
+                !verificationResponse.order ||
+                verificationResponse.order.paymentStatus !== "Paid"
+              ) {
+                throw new Error(
+                  verificationResponse.message ||
+                    "Payment could not be verified.",
+                );
+              }
+
+              setCompletedOrder(verificationResponse.order);
+              setPendingOnlineOrder(null);
+              setItems([]);
+            } catch (error) {
+              showNotification(
+                "Payment verification pending",
+                error.response?.data?.message ||
+                  error.message ||
+                  "We couldn't confirm your payment. Please check your orders before trying to pay again.",
+                "error",
+              );
+            } finally {
+              setPlacingOrder(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              showNotification(
+                "Payment not completed",
+                "The payment window was closed. Your order remains pending; retry payment for this order rather than creating another one.",
+                "info",
+              );
+            },
+          },
+          theme: {
+            color: "#c2185b",
+          },
+        };
+
+        const razorpayCheckout = new window.Razorpay(options);
+
+        razorpayCheckout.on("payment.failed", (event) => {
+          showNotification(
+            "Payment failed",
+            event.error?.description ||
+              "Razorpay could not complete the payment. You can retry.",
+            "error",
+          );
+        });
+
+        razorpayCheckout.open();
+        return;
+      }
+
+      // ================= COD AND WALLET =================
+
+      setCompletedOrder(order);
       setItems([]);
 
-      // Reflect the successful wallet payment in the checkout UI.
-      // The server remains responsible for the actual deduction.
       if (paymentMethod === "WALLET") {
-        if (response.wallet?.balance !== undefined) {
-          setWalletBalance(Number(response.wallet.balance));
+        if (order.wallet?.balance !== undefined) {
+          setWalletBalance(Number(order.wallet.balance));
         } else {
           setWalletBalance((previous) =>
-            Math.max(0, previous - Number(response.order.totalAmount)),
+            Math.max(0, previous - Number(order.totalAmount)),
           );
         }
       }
@@ -336,14 +480,30 @@ function Checkout() {
     }
   };
 
+  // ================= BACK BUTTON =================
+
+  const handleBack = () => {
+    if (isBuyNow) {
+      const productId = buyNowItem?.product?._id || buyNowItem?.productId;
+
+      if (productId) {
+        navigate(`/products/${productId}`);
+      } else {
+        navigate("/products");
+      }
+
+      return;
+    }
+
+    navigate("/cart");
+  };
+
   // ================= LOADING SCREEN =================
 
   if (loading) {
     return (
       <div className="checkout-page">
-        <p className="checkout-loading">
-          Loading checkout...
-        </p>
+        <p className="checkout-loading">Loading checkout...</p>
       </div>
     );
   }
@@ -358,9 +518,7 @@ function Checkout() {
 
           <h1>Order placed successfully!</h1>
 
-          <p>
-            Thank you for shopping with SOLESTYLE.
-          </p>
+          <p>Thank you for shopping with SOLESTYLE.</p>
 
           <div className="checkout-order-number">
             <span>Order number</span>
@@ -368,39 +526,36 @@ function Checkout() {
           </div>
 
           <p>
-            Payment method:{" "}
-            <strong>{completedOrder.paymentMethod}</strong>
+            Payment method: <strong>{completedOrder.paymentMethod}</strong>
           </p>
 
           <p>
             Total:{" "}
-            <strong>
-              ₹{Number(completedOrder.totalAmount).toFixed(2)}
-            </strong>
+            <strong>₹{Number(completedOrder.totalAmount).toFixed(2)}</strong>
           </p>
 
           {completedOrder.paymentMethod === "WALLET" && (
             <p>
-              <Wallet size={16} style={{ verticalAlign: "middle" }} />{" "}
-              Paid using your SOLESTYLE Wallet.
+              <Wallet size={16} style={{ verticalAlign: "middle" }} /> Paid
+              using your SOLESTYLE Wallet.
             </p>
           )}
 
-          <button
-            className="checkout-primary-button"
-            onClick={() =>
-              navigate(`/orders/${completedOrder._id}/track`)
-            }
-          >
-            Track Order
-          </button>
+          <div className="checkout-success-buttons">
+            <button
+              className="checkout-primary-button"
+              onClick={() => navigate(`/orders/${completedOrder._id}/track`)}
+            >
+              Track Order
+            </button>
 
-          <button
-            className="checkout-primary-button"
-            onClick={() => navigate("/products")}
-          >
-            Continue Shopping
-          </button>
+            <button
+              className="checkout-primary-button"
+              onClick={() => navigate("/products")}
+            >
+              Continue Shopping
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -410,12 +565,9 @@ function Checkout() {
 
   return (
     <div className="checkout-page">
-      <button
-        className="checkout-back-button"
-        onClick={() => navigate("/cart")}
-      >
+      <button className="checkout-back-button" onClick={handleBack}>
         <ArrowLeft size={18} />
-        Back to Cart
+        {isBuyNow ? "Back to Product" : "Back to Cart"}
       </button>
 
       <h1 className="checkout-title">Checkout</h1>
@@ -432,9 +584,7 @@ function Checkout() {
 
             {addresses.length === 0 ? (
               <div className="checkout-empty-address">
-                <p>
-                  You haven't added a delivery address yet.
-                </p>
+                <p>You haven't added a delivery address yet.</p>
 
                 <button
                   className="checkout-primary-button"
@@ -450,21 +600,15 @@ function Checkout() {
                     <label
                       key={address._id}
                       className={`checkout-address-card ${
-                        selectedAddress === address._id
-                          ? "selected"
-                          : ""
+                        selectedAddress === address._id ? "selected" : ""
                       }`}
                     >
                       <input
                         type="radio"
                         name="deliveryAddress"
                         value={address._id}
-                        checked={
-                          selectedAddress === address._id
-                        }
-                        onChange={() =>
-                          setSelectedAddress(address._id)
-                        }
+                        checked={selectedAddress === address._id}
+                        onChange={() => setSelectedAddress(address._id)}
                       />
 
                       <div>
@@ -483,8 +627,7 @@ function Checkout() {
                         <p>{address.addressLine}</p>
 
                         <p>
-                          {address.city}, {address.state} -{" "}
-                          {address.pincode}
+                          {address.city}, {address.state} - {address.pincode}
                         </p>
 
                         <p>Phone: {address.phone}</p>
@@ -495,9 +638,7 @@ function Checkout() {
 
                 <button
                   className="checkout-text-button"
-                  onClick={() =>
-                    navigate("/profile#addresses")
-                  }
+                  onClick={() => navigate("/profile#addresses")}
                 >
                   Manage or Add Addresses
                 </button>
@@ -512,8 +653,6 @@ function Checkout() {
               <CreditCard size={21} />
               <h2>Payment Method</h2>
             </div>
-
-            {/* CASH ON DELIVERY */}
 
             <label
               className={`checkout-payment-card ${
@@ -534,8 +673,6 @@ function Checkout() {
               </div>
             </label>
 
-            {/* UPI */}
-
             <label
               className={`checkout-payment-card ${
                 paymentMethod === "UPI" ? "selected" : ""
@@ -551,13 +688,9 @@ function Checkout() {
 
               <div>
                 <strong>UPI Payment</strong>
-                <p>
-                  Online payment integration is coming soon.
-                </p>
+                <p>Pay securely online using Razorpay.</p>
               </div>
             </label>
-
-            {/* WALLET */}
 
             <label
               className={`checkout-payment-card ${
@@ -565,9 +698,7 @@ function Checkout() {
               }`}
               style={{
                 border:
-                  paymentMethod === "WALLET"
-                    ? "1px solid #c2185b"
-                    : undefined,
+                  paymentMethod === "WALLET" ? "1px solid #c2185b" : undefined,
               }}
             >
               <input
@@ -601,9 +732,7 @@ function Checkout() {
                   <>
                     <p>
                       Available balance:{" "}
-                      <strong>
-                        ₹{walletBalance.toFixed(2)}
-                      </strong>
+                      <strong>₹{walletBalance.toFixed(2)}</strong>
                     </p>
 
                     {paymentMethod === "WALLET" &&
@@ -616,11 +745,7 @@ function Checkout() {
                           }}
                         >
                           Insufficient balance. You need ₹
-                          {Math.max(
-                            0,
-                            total - walletBalance,
-                          ).toFixed(2)}{" "}
-                          more.
+                          {Math.max(0, total - walletBalance).toFixed(2)} more.
                         </p>
                       )}
 
@@ -674,9 +799,7 @@ function Checkout() {
               borderRadius: "10px",
             }}
           >
-            <h3 style={{ marginTop: 0 }}>
-              Apply Coupon
-            </h3>
+            <h3 style={{ marginTop: 0 }}>Apply Coupon</h3>
 
             <div
               style={{
@@ -688,14 +811,10 @@ function Checkout() {
                 type="text"
                 value={couponCode}
                 onChange={(event) =>
-                  setCouponCode(
-                    event.target.value.toUpperCase(),
-                  )
+                  setCouponCode(event.target.value.toUpperCase())
                 }
                 placeholder="Enter coupon code"
-                disabled={
-                  Boolean(appliedCoupon) || couponLoading
-                }
+                disabled={Boolean(appliedCoupon) || couponLoading}
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -717,9 +836,7 @@ function Checkout() {
                 <button
                   type="button"
                   className="checkout-primary-button"
-                  disabled={
-                    couponLoading || items.length === 0
-                  }
+                  disabled={couponLoading || items.length === 0}
                   onClick={handleApplyCoupon}
                 >
                   {couponLoading ? "Loading..." : "Apply"}
@@ -729,9 +846,7 @@ function Checkout() {
 
             {availableCoupons.length > 0 && (
               <div style={{ marginTop: "12px" }}>
-                <p style={{ marginBottom: "8px" }}>
-                  Available coupons:
-                </p>
+                <p style={{ marginBottom: "8px" }}>Available coupons:</p>
 
                 {availableCoupons.map((coupon) => (
                   <button
@@ -764,9 +879,9 @@ function Checkout() {
                       : `₹${coupon.discountValue} off`}
 
                     {Number(coupon.minOrderAmount) > 0 &&
-                      ` (Min. order ₹${Number(
-                        coupon.minOrderAmount,
-                      ).toFixed(2)})`}
+                      ` (Min. order ₹${Number(coupon.minOrderAmount).toFixed(
+                        2,
+                      )})`}
                   </button>
                 ))}
               </div>
@@ -781,18 +896,20 @@ function Checkout() {
             )}
           </div>
 
-          {/* CART ITEMS */}
+          {/* CHECKOUT ITEMS */}
 
           {items.length === 0 ? (
-            <p>Your cart is empty.</p>
+            <p>
+              {isBuyNow
+                ? "No product selected. Return to the product page and try again."
+                : "Your cart is empty."}
+            </p>
           ) : (
             <div className="checkout-items">
               {items.map((item, index) => (
                 <div
                   className="checkout-item"
-                  key={
-                    item._id || item.variantId || index
-                  }
+                  key={item._id || item.variantId || index}
                 >
                   <div className="checkout-item-image">
                     {item.image ? (
@@ -806,15 +923,11 @@ function Checkout() {
                   </div>
 
                   <div className="checkout-item-info">
-                    <strong>
-                      {item.product?.name || "Product"}
-                    </strong>
+                    <strong>{item.product?.name || "Product"}</strong>
 
                     <span>
                       {item.color}
-                      {item.size
-                        ? ` · Size ${item.size}`
-                        : ""}
+                      {item.size ? ` · Size ${item.size}` : ""}
                     </span>
 
                     <span>Qty: {item.quantity}</span>
@@ -840,8 +953,7 @@ function Checkout() {
                     <strong>
                       ₹
                       {(
-                        Number(item.price || 0) *
-                        Number(item.quantity || 0)
+                        Number(item.price || 0) * Number(item.quantity || 0)
                       ).toFixed(2)}
                     </strong>
 
@@ -876,21 +988,14 @@ function Checkout() {
           <div className="checkout-price-row">
             <span>Shipping</span>
             <span>
-              {shippingFee === 0
-                ? "FREE"
-                : `₹${shippingFee.toFixed(2)}`}
+              {shippingFee === 0 ? "FREE" : `₹${shippingFee.toFixed(2)}`}
             </span>
           </div>
 
           {appliedCoupon && (
             <div className="checkout-price-row">
-              <span>
-                Discount ({appliedCoupon.code})
-              </span>
-
-              <span style={{ color: "green" }}>
-                -₹{discount.toFixed(2)}
-              </span>
+              <span>Discount ({appliedCoupon.code})</span>
+              <span style={{ color: "green" }}>-₹{discount.toFixed(2)}</span>
             </div>
           )}
 
@@ -905,27 +1010,17 @@ function Checkout() {
                 marginTop: "12px",
                 padding: "12px",
                 borderRadius: "8px",
-                background: hasSufficientWalletBalance
-                  ? "#f0f8f0"
-                  : "#fff1f1",
-                color: hasSufficientWalletBalance
-                  ? "#2e7d32"
-                  : "#c62828",
+                background: hasSufficientWalletBalance ? "#f0f8f0" : "#fff1f1",
+                color: hasSufficientWalletBalance ? "#2e7d32" : "#c62828",
                 fontSize: "14px",
               }}
             >
-              <div>
-                Wallet balance: ₹{walletBalance.toFixed(2)}
-              </div>
-
-              <div>
-                Order total: ₹{total.toFixed(2)}
-              </div>
+              <div>Wallet balance: ₹{walletBalance.toFixed(2)}</div>
+              <div>Order total: ₹{total.toFixed(2)}</div>
 
               {hasSufficientWalletBalance && !walletError && (
                 <div>
-                  Balance after payment: ₹
-                  {(walletBalance - total).toFixed(2)}
+                  Balance after payment: ₹{(walletBalance - total).toFixed(2)}
                 </div>
               )}
             </div>
@@ -940,22 +1035,23 @@ function Checkout() {
               placingOrder ||
               items.length === 0 ||
               addresses.length === 0 ||
+              (isBuyNow && !buyNowItem?.variantId) ||
               (paymentMethod === "WALLET" &&
-                (walletLoading ||
-                  walletError ||
-                  !hasSufficientWalletBalance))
+                (walletLoading || walletError || !hasSufficientWalletBalance))
             }
           >
             {placingOrder
-              ? "Placing Order..."
+              ? "Processing..."
               : paymentMethod === "WALLET"
                 ? "Pay with Wallet"
-                : "Place Order"}
+                : paymentMethod === "UPI"
+                  ? "Pay Online"
+                  : "Place Order"}
           </button>
 
           <p className="checkout-secure-note">
-            Your order will be created after the server
-            validates your cart and payment method.
+            Your order will be created after the server validates your product
+            selection and payment method.
           </p>
         </aside>
       </div>

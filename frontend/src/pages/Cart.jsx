@@ -276,140 +276,200 @@ function Cart() {
           </button>
         </div>
       ) : (
-        <div className="cart-layout">
-          <div className="cart-items">
-            {groupedItems.map((item) => (
-              <div className="cart-item" key={item.variantId}>
-                <img
-                  className="cart-item-image"
-                  src={item.image || "/placeholder.png"}
-                  alt={item.product?.name || "Product"}
-                />
+       
+<div className="cart-layout">
+  <div className="cart-items">
+    {groupedItems.map((item) => {
+      const isUnavailable = item.availability === "unavailable";
+      const isOutOfStock = item.availability === "out_of_stock";
+      const hasInsufficientStock =
+        item.availability === "insufficient_stock" ||
+        (item.stock !== undefined &&
+          Number(item.quantity) > Number(item.stock));
 
-                <div className="cart-item-details">
-                  <h3>{item.product?.name || "Footwear"}</h3>
-                  <p>Color: {item.color}</p>
-                  <p>Size: {item.size}</p>
+      const cannotPurchase =
+        isUnavailable || isOutOfStock || hasInsufficientStock;
 
-                  <div className="cart-item-price">
-                    {Number(item.offerDiscount || 0) > 0 && (
-                      <span
-                        style={{
-                          textDecoration: "line-through",
-                          color: "#888",
-                          marginRight: "8px",
-                          fontWeight: "normal",
-                        }}
-                      >
-                        ₹
-                        {Number(item.originalPrice || 0).toLocaleString(
-                          "en-IN",
-                        )}
-                      </span>
-                    )}
+      // Keep quantity reduction available if stock has decreased.
+      const disableQuantityControls = isUnavailable || isOutOfStock;
 
-                    <strong>
-                      ₹{Number(item.price || 0).toLocaleString("en-IN")}
-                    </strong>
+      return (
+        <div className="cart-item" key={item.variantId || item._id}>
+          <img
+            className="cart-item-image"
+            src={item.image || "/placeholder.png"}
+            alt={item.product?.name || "Product"}
+          />
 
-                    {Number(item.offerDiscount || 0) > 0 && (
-                      <span
-                        style={{
-                          display: "block",
-                          color: "#c2185b",
-                          fontSize: "13px",
-                          marginTop: "4px",
-                        }}
-                      >
-                        Offer savings: ₹
-                        {Number(item.offerDiscount || 0).toLocaleString(
-                          "en-IN",
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  <div className="cart-quantity">
-                    <button
-                      type="button"
-                      aria-label="Decrease quantity"
-                      disabled={
-                        updatingItem === item.variantId || item.quantity <= 1
-                      }
-                      onClick={() => changeQuantity(item, item.quantity - 1)}
-                    >
-                      <Minus size={16} />
-                    </button>
+          <div className="cart-item-details">
+            <h3>{item.product?.name || "Footwear"}</h3>
 
-                    <span>{item.quantity}</span>
+            {cannotPurchase && (
+              <p className="cart-unavailable-message" role="alert">
+                {item.unavailableReason ||
+                  (isOutOfStock
+                    ? "This product is out of stock."
+                    : hasInsufficientStock
+                      ? `Only ${Number(item.stock || 0)} item(s) are available. Please reduce the quantity.`
+                      : "This product has been removed or is no longer available. Please remove it from your cart.")}
+              </p>
+            )}
 
-                    <button
-                      type="button"
-                      aria-label="Increase quantity"
-                      disabled={
-                        updatingItem === item.variantId ||
-                        item.quantity >= item.stock
-                      }
-                      onClick={() => changeQuantity(item, item.quantity + 1)}
-                    >
-                      <Plus size={16} />
-                    </button>
-                  </div>
+            <p>Color: {item.color || "Unavailable"}</p>
+            <p>Size: {item.size || "Unavailable"}</p>
 
-                  <div className="cart-item-actions">
-                    <button
-                      type="button"
-                      className="cart-remove-button"
-                      disabled={updatingItem === item.variantId}
-                      onClick={() => handleRemove(item)}
-                    >
-                      <Trash2 size={16} />
-                      Remove
-                    </button>
-
-                    <button
-                      type="button"
-                      className="cart-wishlist-button"
-                      disabled={updatingItem === item.variantId}
-                      onClick={() => handleMoveToWishlist(item)}
-                    >
-                      <Heart size={16} />
-                      Move to Wishlist
-                    </button>
-                  </div>
-                </div>
-
-                <p className="cart-item-subtotal">
+            <div className="cart-item-price">
+              {Number(item.offerDiscount || 0) > 0 && (
+                <span
+                  style={{
+                    textDecoration: "line-through",
+                    color: "#888",
+                    marginRight: "8px",
+                    fontWeight: "normal",
+                  }}
+                >
                   ₹
-                  {Number(
-                    Number(item.price || 0) * item.quantity,
-                  ).toLocaleString("en-IN")}
-                </p>
-              </div>
-            ))}
-          </div>
+                  {Number(item.originalPrice || 0).toLocaleString("en-IN")}
+                </span>
+              )}
 
-          <div className="cart-summary">
-            <h2>Order Summary</h2>
+              <strong>
+                ₹{Number(item.price || 0).toLocaleString("en-IN")}
+              </strong>
 
-            <div className="cart-summary-row">
-              <span>Total Items</span>
-              <span>{totalItems}</span>
+              {Number(item.offerDiscount || 0) > 0 && (
+                <span
+                  style={{
+                    display: "block",
+                    color: "#c2185b",
+                    fontSize: "13px",
+                    marginTop: "4px",
+                  }}
+                >
+                  Offer savings: ₹
+                  {Number(item.offerDiscount || 0).toLocaleString("en-IN")}
+                </span>
+              )}
             </div>
 
-            <div className="cart-summary-row cart-total">
-              <span>Total</span>
-              <span>₹{totalPrice.toLocaleString("en-IN")}</span>
+            <div className="cart-quantity">
+              <button
+                type="button"
+                aria-label="Decrease quantity"
+                disabled={
+                  disableQuantityControls ||
+                  updatingItem === item.variantId ||
+                  item.quantity <= 1
+                }
+                onClick={() => changeQuantity(item, item.quantity - 1)}
+              >
+                <Minus size={16} />
+              </button>
+
+              <span>{item.quantity}</span>
+
+              <button
+                type="button"
+                aria-label="Increase quantity"
+                disabled={
+                  disableQuantityControls ||
+                  updatingItem === item.variantId ||
+                  item.quantity >= item.stock
+                }
+                onClick={() => changeQuantity(item, item.quantity + 1)}
+              >
+                <Plus size={16} />
+              </button>
             </div>
 
-            <button
-              type="button"
-              className="cart-checkout-button"
-              onClick={() => navigate("/checkout")}
-            >
-              Proceed to Checkout
-            </button>
+            <div className="cart-item-actions">
+              <button
+                type="button"
+                className="cart-remove-button"
+                disabled={updatingItem === item.variantId}
+                onClick={() => handleRemove(item)}
+              >
+                <Trash2 size={16} />
+                Remove
+              </button>
+
+              <button
+                type="button"
+                className="cart-wishlist-button"
+                disabled={
+                  updatingItem === item.variantId || cannotPurchase
+                }
+                onClick={() => handleMoveToWishlist(item)}
+              >
+                <Heart size={16} />
+                Move to Wishlist
+              </button>
+            </div>
           </div>
+
+          <p className="cart-item-subtotal">
+            {isUnavailable ? (
+              "Unavailable"
+            ) : (
+              <>
+                ₹
+                {Number(
+                  Number(item.price || 0) * item.quantity
+                ).toLocaleString("en-IN")}
+              </>
+            )}
+          </p>
         </div>
+      );
+    })}
+  </div>
+
+  <div className="cart-summary">
+    <h2>Order Summary</h2>
+
+    <div className="cart-summary-row">
+      <span>Total Items</span>
+      <span>{totalItems}</span>
+    </div>
+
+    <div className="cart-summary-row cart-total">
+      <span>Total</span>
+      <span>₹{totalPrice.toLocaleString("en-IN")}</span>
+    </div>
+
+    {groupedItems.some(
+      (item) =>
+        item.availability === "unavailable" ||
+        item.availability === "out_of_stock" ||
+        item.availability === "insufficient_stock" ||
+        (item.stock !== undefined &&
+          Number(item.quantity) > Number(item.stock))
+    ) && (
+      <p className="cart-unavailable-message">
+        Remove unavailable products or reduce quantities before checkout.
+      </p>
+    )}
+
+    <button
+      type="button"
+      className="cart-checkout-button"
+      disabled={
+        groupedItems.length === 0 ||
+        groupedItems.some(
+          (item) =>
+            item.availability === "unavailable" ||
+            item.availability === "out_of_stock" ||
+            item.availability === "insufficient_stock" ||
+            (item.stock !== undefined &&
+              Number(item.quantity) > Number(item.stock))
+        )
+      }
+      onClick={() => navigate("/checkout")}
+    >
+      Proceed to Checkout
+    </button>
+          </div>
+          </div>
       )}
     </div>
   );
