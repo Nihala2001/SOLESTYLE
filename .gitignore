@@ -1,6 +1,12 @@
 # Environment files
+.env
+.env.*
+!.env.example
+
 backend/.env
 frontend/.env
+frontend/.env.*
+!frontend/.env.example
 
 # Dependencies
 node_modules/
