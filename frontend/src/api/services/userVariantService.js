@@ -9,3 +9,4 @@ export const getProductVariants = async (productId) => {
 
   return response.data;
 };
+

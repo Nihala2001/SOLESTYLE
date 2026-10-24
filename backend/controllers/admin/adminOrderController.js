@@ -2,6 +2,115 @@ const mongoose = require("mongoose");
 const Order = require("../../models/Order");
 const Wallet = require("../../models/Wallet");
 const Variant = require("../../models/Variant");
+const User = require("../../models/User");
+
+
+// Calculate overall status from individual product statuses.
+const calculateOverallOrderStatus = (items) => {
+    const activeItems = items.filter((item) => {
+        const orderedQuantity = Number(item.quantity || 0);
+        const cancelledQuantity = Number(item.cancelledQuantity || 0);
+
+        return cancelledQuantity < orderedQuantity;
+    });
+
+    if (activeItems.length === 0) {
+        return "Cancelled";
+    }
+
+    const statusPriority = {
+        Placed: 1,
+        Confirmed: 2,
+        Shipped: 3,
+        "Out for Delivery": 4,
+        Delivered: 5,
+    };
+
+    // The least advanced active product determines overall progress.
+    return activeItems.reduce((leastAdvanced, item) => {
+        const itemStatus = statusPriority[item.status]
+            ? item.status
+            : "Placed";
+
+        return statusPriority[itemStatus] <
+            statusPriority[leastAdvanced]
+            ? itemStatus
+            : leastAdvanced;
+    }, activeItems[0].status || "Placed");
+};
+
+
+// Credit a referrer ₹100 for a referred customer's delivered order.
+// A deterministic transaction ID prevents duplicate rewards.
+const creditReferralReward = async (order, session = null) => {
+    const userQuery = User.findById(order.userId)
+        .select("_id name referredBy");
+
+    if (session) {
+        userQuery.session(session);
+    }
+
+    const referredUser = await userQuery;
+
+    // This customer did not register through a referral.
+    if (!referredUser?.referredBy) {
+        return false;
+    }
+
+    const transactionId = `REFERRAL-${referredUser._id}`;
+
+    const walletQuery = Wallet.findOne({
+        userId: referredUser.referredBy,
+    });
+
+    if (session) {
+        walletQuery.session(session);
+    }
+
+    let wallet = await walletQuery;
+
+    if (!wallet) {
+        wallet = new Wallet({
+            userId: referredUser.referredBy,
+            balance: 0,
+            transactions: [],
+        });
+    }
+
+    // A customer can generate only one referral reward.
+    const alreadyRewarded = wallet.transactions.some(
+        (transaction) => transaction.transactionId === transactionId
+    );
+
+    if (alreadyRewarded) {
+        return false;
+    }
+
+    const rewardAmount = 100;
+    const newBalance = Number(
+        (Number(wallet.balance || 0) + rewardAmount).toFixed(2)
+    );
+
+    wallet.balance = newBalance;
+
+    wallet.transactions.push({
+        type: "Credit",
+        amount: rewardAmount,
+        description: `Referral Reward for ${referredUser.name}'s first delivered order`,
+        referenceType: "Referral",
+        referenceId: order._id,
+        balanceAfter: newBalance,
+        transactionId,
+    });
+
+    if (session) {
+        await wallet.save({ session });
+    } else {
+        await wallet.save();
+    }
+
+    return true;
+};
 
 // Get all orders
 const getAllOrders = async (req, res) => {
@@ -291,6 +400,10 @@ const updateOrderStatus = async (req, res) => {
 
             await order.save({ session });
 
+            if (orderStatus === "Delivered") {
+                await creditReferralReward(order, session);
+            }
+
             updatedOrder = order;
         });
 
@@ -317,6 +430,150 @@ const updateOrderStatus = async (req, res) => {
     }
 };
 
+
+
+// Update the delivery status of one product in an order.
+const updateOrderItemStatus = async (req, res) => {
+    try {
+        const { orderId, itemId } = req.params;
+        const { status } = req.body;
+
+        if (
+            !mongoose.isValidObjectId(orderId) ||
+            !mongoose.isValidObjectId(itemId)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid order ID or item ID",
+            });
+        }
+
+        const allowedTransitions = {
+            Placed: ["Confirmed"],
+            Confirmed: ["Shipped"],
+            Shipped: ["Out for Delivery"],
+            "Out for Delivery": ["Delivered"],
+            Delivered: [],
+        };
+
+        if (
+            !Object.prototype.hasOwnProperty.call(
+                allowedTransitions,
+                status
+            )
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid product delivery status",
+            });
+        }
+
+        const order = await Order.findById(orderId);
+
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: "Order not found",
+            });
+        }
+
+        if (
+            ["Cancelled", "Returned", "Return Requested"].includes(
+                order.orderStatus
+            )
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "This order cannot be updated through delivery status management",
+            });
+        }
+
+        // Find the specific product using its stable MongoDB subdocument ID.
+        const item = order.items.id(itemId);
+
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: "Product not found in this order",
+            });
+        }
+
+        if (
+            Number(item.cancelledQuantity || 0) >=
+            Number(item.quantity || 0)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "This product has been fully cancelled",
+            });
+        }
+
+        const currentStatus = item.status || "Placed";
+
+        if (currentStatus === status) {
+            return res.status(400).json({
+                success: false,
+                message: `This product is already ${status}`,
+            });
+        }
+
+        if (!allowedTransitions[currentStatus]?.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    `Invalid product status transition: ${currentStatus} → ${status}`,
+            });
+        }
+
+        // Update only the selected product.
+        item.status = status;
+
+        // Record the delivery date for this individual product.
+        if (status === "Delivered" && !item.deliveredAt) {
+            item.deliveredAt = new Date();
+        }
+
+        // Recalculate the overall order status.
+        const previousOverallStatus = order.orderStatus;
+        const newOverallStatus = calculateOverallOrderStatus(
+            order.items
+        );
+
+        order.orderStatus = newOverallStatus;
+
+        // Record the overall delivery date when the entire order
+        // first reaches Delivered.
+        if (
+            newOverallStatus === "Delivered" &&
+            previousOverallStatus !== "Delivered"
+        ) {
+            order.deliveredAt = new Date();
+        }
+
+        await order.save();
+
+        if (
+            newOverallStatus === "Delivered" &&
+            previousOverallStatus !== "Delivered"
+        ) {
+            await creditReferralReward(order);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Product delivery status updated successfully",
+            order,
+        });
+    } catch (error) {
+        console.error("Update individual product status error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to update product delivery status",
+        });
+    }
+};
 
 // Update payment status after confirming payment
 const updatePaymentStatus = async (req, res) => {
@@ -672,12 +929,26 @@ const updateReturnExchangeStatus = async (req, res) => {
                 );
             }
 
+            // Refunds are allowed only for a delivered item.
             if (
-                order.orderStatus !== "Delivered" &&
-                order.orderStatus !== "Return Requested"
+                item.status !== "Delivered" ||
+                !item.deliveredAt
             ) {
                 throw Object.assign(
-                    new Error("Only delivered orders can be refunded"),
+                    new Error(
+                        "Only delivered products can be refunded"
+                    ),
+                    { statusCode: 400 }
+                );
+            }
+
+            // Enforce the return window from this item's delivery date.
+            const returnDeadline = new Date(item.deliveredAt);
+            returnDeadline.setDate(returnDeadline.getDate() + 7);
+
+            if (new Date() > returnDeadline) {
+                throw Object.assign(
+                    new Error("The 7-day return window has expired"),
                     { statusCode: 400 }
                 );
             }
@@ -887,6 +1158,7 @@ module.exports = {
     getAllOrders,
     getOrderById,
     updateOrderStatus,
+    updateOrderItemStatus,
     updatePaymentStatus,
     getReturnExchangeRequests,
     updateReturnExchangeStatus,

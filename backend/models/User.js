@@ -49,6 +49,22 @@ const userSchema = new mongoose.Schema(
       default: null
     },
 
+    referredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    referralFirstOrderDiscountUsed: {
+      type: Boolean,
+      default: false,
+    },
+
+    referralFirstOrderDiscountUsed: {
+      type: Boolean,
+      default: false,
+    },
+
     isActive: {
       type: Boolean,
       default: true

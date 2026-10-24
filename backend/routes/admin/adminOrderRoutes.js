@@ -7,6 +7,7 @@ const {
     getAllOrders,
     getOrderById,
     updateOrderStatus,
+    updateOrderItemStatus,
     updatePaymentStatus,
     getReturnExchangeRequests,
     updateReturnExchangeStatus,
@@ -36,6 +37,12 @@ router.patch(
     updatePaymentStatus
 );
 
+// Update one product's delivery status.
+router.patch(
+    "/:orderId/items/:itemId/status",
+    adminAuthMiddleware,
+    updateOrderItemStatus
+);
 
 
 module.exports = router;

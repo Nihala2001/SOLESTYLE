@@ -913,14 +913,6 @@ function AdminAddProduct() {
         {/* ================= HEADER ================= */}
 
         <div className="add-product-header">
-          <div>
-            <h1>Add Product</h1>
-
-            <p>
-              Add a new product to your
-              store.
-            </p>
-          </div>
 
           <button
             type="button"

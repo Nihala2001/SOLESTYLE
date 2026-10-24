@@ -25,6 +25,10 @@ function ProductDetails() {
 
   const [product, setProduct] = useState(null);
   const [variants, setVariants] = useState([]);
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [similarSortBy, setSimilarSortBy] = useState("recommended");
+  const [similarMaxPrice, setSimilarMaxPrice] = useState("");
+  const [similarInStockOnly, setSimilarInStockOnly] = useState(false);
 
   const [reviews, setReviews] = useState([]);
   const [averageRating, setAverageRating] = useState(0);
@@ -38,6 +42,7 @@ function ProductDetails() {
   const [loading, setLoading] = useState(true);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   const [addingToCart, setAddingToCart] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -82,16 +87,60 @@ function ProductDetails() {
         let foundProduct = null;
 
         if (productData.success) {
+          const activeProducts = productData.products || [];
+
           foundProduct =
-            productData.products.find(
+            activeProducts.find(
               (item) => String(item._id) === String(productId),
             ) || null;
 
           setProduct(foundProduct);
+
+          if (foundProduct) {
+            const currentCategoryId = String(
+              foundProduct.categoryId?._id || foundProduct.categoryId || "",
+            );
+
+            const relatedProducts = activeProducts.filter((item) => {
+              const itemCategoryId = String(
+                item.categoryId?._id || item.categoryId || "",
+              );
+
+              return (
+                String(item._id) !== String(productId) &&
+                currentCategoryId !== "" &&
+                itemCategoryId === currentCategoryId
+              );
+            });
+
+            const relatedProductsWithStock = await Promise.all(
+              relatedProducts.slice(0, 4).map(async (item) => {
+                try {
+                  const variantData = await getProductVariants(item._id);
+
+                  return {
+                    ...item,
+                    inStock: Boolean(
+                      variantData.success &&
+                      variantData.variants?.some(
+                        (variant) => Number(variant.stock) > 0,
+                      ),
+                    ),
+                  };
+                } catch {
+                  return { ...item, inStock: false };
+                }
+              }),
+            );
+
+            setSimilarProducts(relatedProductsWithStock);
+          } else {
+            setSimilarProducts([]);
+          }
         } else {
           setProduct(null);
+          setSimilarProducts([]);
         }
-
         const variantData = await getProductVariants(productId);
 
         if (variantData.success) {
@@ -137,6 +186,38 @@ function ProductDetails() {
 
     fetchProduct();
   }, [productId, isExchangeMode, exchangeContext?.originalColor]);
+
+  const filteredSimilarProducts = similarProducts
+    .filter((item) => {
+      const price = Number(item.displayPrice ?? item.basePrice ?? 0);
+
+      if (similarMaxPrice !== "" && price > Number(similarMaxPrice)) {
+        return false;
+      }
+
+      if (similarInStockOnly && !item.inStock) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const priceA = Number(a.displayPrice ?? a.basePrice ?? 0);
+      const priceB = Number(b.displayPrice ?? b.basePrice ?? 0);
+
+      switch (similarSortBy) {
+        case "price-low":
+          return priceA - priceB;
+        case "price-high":
+          return priceB - priceA;
+        case "name-asc":
+          return (a.name || "").localeCompare(b.name || "");
+        case "newest":
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        default:
+          return 0;
+      }
+    });
 
   // ================= FETCH PRODUCT REVIEWS =================
 
@@ -385,10 +466,18 @@ function ProductDetails() {
       },
     });
   };
+
   // ================= CONTINUE EXCHANGE =================
 
   const handleContinueExchange = () => {
     setExchangeError("");
+
+    if (!exchangeContext?.orderId || exchangeContext.itemIndex == null) {
+      setExchangeError(
+        "Order details are missing. Please start the exchange again.",
+      );
+      return;
+    }
 
     if (!selectedColor || !selectedSize || !selectedVariant) {
       setExchangeError("Please select a color and size.");
@@ -421,7 +510,7 @@ function ProductDetails() {
       return;
     }
 
-    navigate("/profile", {
+    navigate(`/orders/${exchangeContext.orderId}/track`, {
       state: {
         exchangeReturn: {
           ...exchangeContext,
@@ -429,7 +518,7 @@ function ProductDetails() {
           replacementVariantId: selectedVariant._id,
           replacementColor: selectedVariant.color,
           replacementSize: selectedVariant.size,
-          replacementPrice: selectedVariant.price,
+          replacementPrice: replacementPrice,
         },
       },
     });
@@ -918,27 +1007,184 @@ function ProductDetails() {
         )}
       </section>
 
-      {/* IMAGE VIEWER */}
+      {/* ================= SIMILAR PRODUCTS ================= */}
+
+      {!isExchangeMode && similarProducts.length > 0 && (
+        <section className="similar-products-section">
+          <div className="similar-products-heading">
+            <h2>You May Also Like</h2>
+            <p>Discover more styles from the same category.</p>
+          </div>
+
+          <div className="similar-products-toolbar">
+            <div className="similar-products-control">
+              <label htmlFor="similar-sort">Sort by</label>
+              <select
+                id="similar-sort"
+                value={similarSortBy}
+                onChange={(event) => setSimilarSortBy(event.target.value)}
+              >
+                <option value="recommended">Recommended</option>
+                <option value="price-low">Price: Low to High</option>
+                <option value="price-high">Price: High to Low</option>
+                <option value="name-asc">Name: A to Z</option>
+                <option value="newest">Newest First</option>
+              </select>
+            </div>
+
+            <div className="similar-products-control">
+              <label htmlFor="similar-max-price">Max price (₹)</label>
+              <input
+                id="similar-max-price"
+                type="number"
+                min="0"
+                placeholder="Any price"
+                value={similarMaxPrice}
+                onChange={(event) => setSimilarMaxPrice(event.target.value)}
+              />
+            </div>
+
+            <label className="similar-stock-filter">
+              <input
+                type="checkbox"
+                checked={similarInStockOnly}
+                onChange={(event) =>
+                  setSimilarInStockOnly(event.target.checked)
+                }
+              />
+              In stock only
+            </label>
+
+            <button
+              type="button"
+              className="similar-reset-filters"
+              onClick={() => {
+                setSimilarSortBy("recommended");
+                setSimilarMaxPrice("");
+                setSimilarInStockOnly(false);
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+
+          {filteredSimilarProducts.length > 0 ? (
+            <div className="similar-products-grid">
+              {filteredSimilarProducts.map((item) => (
+                <button
+                  type="button"
+                  key={item._id}
+                  className="similar-product-card"
+                  onClick={() => {
+                    setIsZoomed(false);
+                    setZoomLevel(1);
+                    navigate(`/products/${item._id}`);
+                  }}
+                >
+                  <div className="similar-product-image-wrapper">
+                    {item.displayImage || item.images?.[0] ? (
+                      <img
+                        src={item.displayImage || item.images[0]}
+                        alt={item.name}
+                        className="similar-product-image"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="similar-product-no-image">
+                        No Image Available
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="similar-product-info">
+                    <h3>{item.name}</h3>
+
+                    <p className="similar-product-price">
+                      ₹
+                      {Number(
+                        item.displayPrice ?? item.basePrice ?? 0,
+                      ).toLocaleString("en-IN")}
+                    </p>
+
+                    <span className="similar-product-view">View Product →</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="similar-products-empty">
+              No similar products match these filters.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* IMAGE VIEWER WITH ZOOM */}
 
       {isZoomed && currentImage && (
         <div
           className="image-viewer-overlay"
-          onClick={() => setIsZoomed(false)}
+          onClick={() => {
+            setIsZoomed(false);
+            setZoomLevel(1);
+          }}
         >
           <button
             type="button"
             className="image-viewer-close"
-            onClick={() => setIsZoomed(false)}
+            onClick={() => {
+              setIsZoomed(false);
+              setZoomLevel(1);
+            }}
             aria-label="Close image viewer"
           >
             ×
           </button>
 
+          <div
+            className="image-zoom-controls"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setZoomLevel((previous) => Math.max(1, previous - 0.25))
+              }
+              disabled={zoomLevel <= 1}
+              aria-label="Zoom out"
+            >
+              −
+            </button>
+
+            <span>{Math.round(zoomLevel * 100)}%</span>
+
+            <button
+              type="button"
+              onClick={() =>
+                setZoomLevel((previous) => Math.min(3, previous + 0.25))
+              }
+              disabled={zoomLevel >= 3}
+              aria-label="Zoom in"
+            >
+              +
+            </button>
+          </div>
+
           <img
             src={currentImage}
             alt={`${product.name} - ${selectedColor}`}
             className="image-viewer-image"
+            style={{ transform: `scale(${zoomLevel})` }}
             onClick={(event) => event.stopPropagation()}
+            onWheel={(event) => {
+              event.preventDefault();
+              setZoomLevel((previous) =>
+                Math.min(
+                  3,
+                  Math.max(1, previous + (event.deltaY < 0 ? 0.25 : -0.25)),
+                ),
+              );
+            }}
           />
         </div>
       )}

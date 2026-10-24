@@ -16,6 +16,18 @@ export const createOrder = async (
   return response.data;
 };
 
+export const getCheckoutDiscountPreview = async (
+  couponCode = null,
+  buyNowVariantId = null,
+) => {
+  const response = await api.post("/orders/preview-discounts", {
+    couponCode,
+    buyNowVariantId,
+  });
+
+  return response.data;
+};
+
 export const getMyOrders = async () => {
   const response = await api.get("/orders/my-orders");
   return response.data;
@@ -29,21 +41,19 @@ export const requestReturnExchange = async (
   type,
   reason,
   replacementVariantId = null,
-  quantity = 1,
+  quantity = 1
 ) => {
   const response = await api.post("/orders/return-exchange", {
     orderId,
     itemIndex,
     type,
     reason,
-    quantity: Number(quantity),
-    replacementVariantId:
-      type === "Exchange" ? replacementVariantId : null,
+    replacementVariantId,
+    quantity,
   });
 
   return response.data;
 };
-
 
 // Cancel order
 

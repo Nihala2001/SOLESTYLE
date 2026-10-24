@@ -23,10 +23,9 @@ const walletTransactionSchema = new mongoose.Schema(
 
     referenceType: {
       type: String,
-      enum: ["Order", "Refund", "Adjustment"],
+      enum: ["Order", "Refund", "Adjustment", "Referral", "WalletTopUp"],
       default: "Adjustment",
     },
-
     referenceId: {
       type: mongoose.Schema.Types.ObjectId,
       default: null,

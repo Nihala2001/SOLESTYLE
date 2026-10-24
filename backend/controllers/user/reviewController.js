@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Review = require("../../models/Review");
 const Order = require("../../models/Order");
 
+
 /* ================= CREATE REVIEW ================= */
 
 const createReview = async (req, res) => {
@@ -47,47 +48,101 @@ const createReview = async (req, res) => {
             });
         }
 
-        const deliveredOrder = await Order.findOne({
+        // Verify that the order belongs to the logged-in customer.
+        const order = await Order.findOne({
             _id: orderId,
             userId,
-            orderStatus: "Delivered",
-            deliveredAt: { $ne: null },
-            "items.productId": productId,
         });
 
-        if (!deliveredOrder) {
+        if (!order) {
             return res.status(403).json({
-                message:
-                    "You can review this product only after receiving it.",
+                message: "Order not found or you are not authorized to review it.",
             });
         }
 
-        // A hidden review still counts as an existing review.
-        const existingReview = await Review.findOne({
-            userId,
-            productId,
-        });
+       // Find the exact product item in this order.
+const { itemIndex } = req.body;
 
-        if (existingReview) {
-            return res.status(409).json({
-                message: "You have already reviewed this product.",
-            });
-        }
+let matchingItem;
 
-        const review = await Review.create({
-            userId,
-            productId,
-            orderId,
-            rating: numericRating,
-            title: cleanTitle,
-            comment: cleanComment,
-        });
+if (
+    itemIndex !== undefined &&
+    Number.isInteger(Number(itemIndex)) &&
+    Number(itemIndex) >= 0
+) {
+    matchingItem = order.items[Number(itemIndex)];
 
-        return res.status(201).json({
-            message: "Review submitted successfully",
-            review,
+    const selectedProductId =
+        matchingItem?.productId?._id || matchingItem?.productId;
+
+    if (
+        !matchingItem ||
+        String(selectedProductId) !== String(productId)
+    ) {
+        return res.status(403).json({
+            message: "This product does not belong to the selected order.",
         });
-    } catch (error) {
+    }
+} else {
+    matchingItem = order.items.find((item) => {
+        const itemProductId =
+            item.productId?._id || item.productId;
+
+        return String(itemProductId) === String(productId);
+    });
+}
+
+if (!matchingItem) {
+    return res.status(403).json({
+        message: "This product does not belong to the selected order.",
+    });
+}
+
+// Validate the individual item's delivery status.
+const itemStatus = String(matchingItem.status || "").toLowerCase();
+
+if (itemStatus !== "delivered") {
+    return res.status(403).json({
+        message: "You can review this product only after receiving it.",
+    });
+}
+
+// Prevent reviews for items whose entire quantity was cancelled.
+const quantity = Number(matchingItem.quantity || 0);
+const cancelledQuantity = Number(matchingItem.cancelledQuantity || 0);
+
+if (quantity > 0 && cancelledQuantity >= quantity) {
+    return res.status(403).json({
+        message: "A fully cancelled product cannot be reviewed.",
+    });
+}
+
+// A hidden review still counts as an existing review.
+const existingReview = await Review.findOne({
+    userId,
+    productId,
+});
+
+if (existingReview) {
+    return res.status(409).json({
+        message: "You have already reviewed this product.",
+    });
+}
+
+const review = await Review.create({
+    userId,
+    productId,
+    orderId,
+    rating: numericRating,
+    title: cleanTitle,
+    comment: cleanComment,
+});
+
+return res.status(201).json({
+    success: true,
+    message: "Review submitted successfully",
+    review,
+})    } catch (error) {
         if (error.code === 11000) {
             return res.status(409).json({
                 message: "You have already reviewed this product.",
@@ -102,6 +157,9 @@ const createReview = async (req, res) => {
     }
 };
 
+
+
+    
 /* ================= GET PUBLIC PRODUCT REVIEWS ================= */
 
 const getProductReviews = async (req, res) => {

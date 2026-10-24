@@ -223,11 +223,6 @@ function AdminUsers() {
         }}
       />
       <div className="users-page-header">
-        <div>
-          <h1>Customers</h1>
-          <p>Manage all registered SOLESTYLE customers.</p>
-        </div>
-
         <div className="user-count">{pagination.totalUsers} Users</div>
       </div>
 

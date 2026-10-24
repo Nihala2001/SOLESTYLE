@@ -25,6 +25,12 @@ function Products() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  const [sortBy, setSortBy] = useState("recommended");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [productStock, setProductStock] = useState({});
+
   const [wishlistItems, setWishlistItems] = useState([]);
   const [wishlistBusy, setWishlistBusy] = useState({});
   const [notification, setNotification] = useState({
@@ -59,7 +65,31 @@ function Products() {
       });
 
       if (data.success) {
-        setProducts(data.products || []);
+        const fetchedProducts = data.products || [];
+        setProducts(fetchedProducts);
+
+        // Get stock information for the products currently displayed.
+        const stockResults = await Promise.all(
+          fetchedProducts.map(async (product) => {
+            try {
+              const variantData = await getProductVariants(product._id);
+
+              return [
+                product._id,
+                Boolean(
+                  variantData.success &&
+                  variantData.variants?.some(
+                    (variant) => Number(variant.stock) > 0,
+                  ),
+                ),
+              ];
+            } catch {
+              return [product._id, false];
+            }
+          }),
+        );
+
+        setProductStock(Object.fromEntries(stockResults));
 
         const pages = data.totalPages ?? data.pagination?.totalPages ?? 1;
         setTotalPages(Math.max(1, Number(pages) || 1));
@@ -231,6 +261,44 @@ function Products() {
     }
   };
 
+  const filteredProducts = products
+  .filter((product) => {
+    const price = Number(product.displayPrice ?? product.basePrice ?? 0);
+
+    if (minPrice !== "" && price < Number(minPrice)) return false;
+    if (maxPrice !== "" && price > Number(maxPrice)) return false;
+
+    if (inStockOnly && !productStock[product._id]) return false;
+
+    return true;
+  })
+  .sort((a, b) => {
+    const priceA = Number(a.displayPrice ?? a.basePrice ?? 0);
+    const priceB = Number(b.displayPrice ?? b.basePrice ?? 0);
+
+    switch (sortBy) {
+      case "price-low":
+        return priceA - priceB;
+      case "price-high":
+        return priceB - priceA;
+      case "name-asc":
+        return (a.name || "").localeCompare(b.name || "");
+      case "name-desc":
+        return (b.name || "").localeCompare(a.name || "");
+      case "newest":
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      default:
+        return 0;
+    }
+  });
+
+const resetFilters = () => {
+  setSortBy("recommended");
+  setMinPrice("");
+  setMaxPrice("");
+  setInStockOnly(false);
+};
+
   const handlePageChange = (page) => {
     if (page < 1 || page > totalPages || page === currentPage) return;
 
@@ -253,13 +321,69 @@ function Products() {
         duration={2000}
       />
 
-      <div className="products-header">
-        <h1>Shop</h1>
-        <p>Discover our collection of women’s footwear</p>
-      </div>
+   <div className="products-toolbar">
+  <div className="products-filter-controls">
+    <div className="products-control">
+      <label htmlFor="product-sort">Sort by</label>
+      <select
+        id="product-sort"
+        value={sortBy}
+        onChange={(event) => setSortBy(event.target.value)}
+      >
+        <option value="recommended">Recommended</option>
+        <option value="price-low">Price: Low to High</option>
+        <option value="price-high">Price: High to Low</option>
+        <option value="name-asc">Name: A to Z</option>
+        <option value="name-desc">Name: Z to A</option>
+        <option value="newest">Newest First</option>
+      </select>
+    </div>
+
+    <div className="products-control">
+      <label htmlFor="min-price">Min price (₹)</label>
+      <input
+        id="min-price"
+        type="number"
+        min="0"
+        placeholder="0"
+        value={minPrice}
+        onChange={(event) => setMinPrice(event.target.value)}
+      />
+    </div>
+
+    <div className="products-control">
+      <label htmlFor="max-price">Max price (₹)</label>
+      <input
+        id="max-price"
+        type="number"
+        min="0"
+        placeholder="Any"
+        value={maxPrice}
+        onChange={(event) => setMaxPrice(event.target.value)}
+      />
+    </div>
+
+    <label className="products-stock-filter">
+      <input
+        type="checkbox"
+        checked={inStockOnly}
+        onChange={(event) => setInStockOnly(event.target.checked)}
+      />
+      In stock only
+    </label>
+
+    <button
+      type="button"
+      className="products-reset-filters"
+      onClick={resetFilters}
+    >
+      Clear filters
+    </button>
+  </div>
+</div>
 
       <div className="products-grid">
-        {products.map((product) => {
+        {filteredProducts.map((product) => {
           const productVariantIds = wishlistItems.map(getWishlistVariantId);
 
           // A card appears wishlisted if any of its variants is wishlisted.
@@ -350,9 +474,12 @@ function Products() {
         })}
       </div>
 
-      {products.length === 0 && (
-        <div className="no-products">No products available.</div>
-      )}
+      {filteredProducts.length === 0 && (
+  <div className="no-products">
+    No products match your filters. Try changing your price range or clearing
+    the filters.
+  </div>
+)}
 
       {totalPages > 1 && products.length > 0 && (
         <div className="products-pagination">

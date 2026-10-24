@@ -44,7 +44,7 @@ function ResetPassword() {
 
     // After successful password reset
     if (notificationTitle === "Password Reset Successful") {
-      navigate("/login");
+      navigate("/login", { replace: true });
     }
   };
 

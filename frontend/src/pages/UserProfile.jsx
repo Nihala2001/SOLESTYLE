@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import {
   User,
@@ -16,7 +16,7 @@ import {
   Mail,
   X,
   Wallet,
-  Star,
+  Gift,
 } from "lucide-react";
 
 import NotificationModal from "../components/common/NotificationModal";
@@ -40,35 +40,14 @@ import {
 
 import {
   getMyOrders,
-  requestReturnExchange,
   cancelOrder,
   downloadInvoice,
 } from "../api/services/userOrderService";
 
-import { createReview, getMyReviews } from "../api/services/userReviewService";
-
 import "./UserProfile.css";
-
-const isReturnExchangeAvailable = (order, type) => {
-  if (!order?.deliveredAt || order.orderStatus !== "Delivered") {
-    return false;
-  }
-
-  const allowedDays = type === "Return" ? 7 : 10;
-
-  const deliveryDate = new Date(order.deliveredAt);
-  deliveryDate.setHours(0, 0, 0, 0);
-
-  const deadline = new Date(deliveryDate);
-  deadline.setDate(deadline.getDate() + allowedDays);
-  deadline.setHours(23, 59, 59, 999);
-
-  return new Date() <= deadline;
-};
 
 function UserProfile() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   // ================= USER =================
 
@@ -88,20 +67,6 @@ function UserProfile() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
   const [showOrders, setShowOrders] = useState(false);
-
-  // ================= RETURN / EXCHANGE =================
-
-  const [returnExchangeForm, setReturnExchangeForm] = useState(null);
-  const [returnExchangeReason, setReturnExchangeReason] = useState("");
-  const [returnExchangeError, setReturnExchangeError] = useState("");
-  const [returnExchangeLoading, setReturnExchangeLoading] = useState(false);
-
-  const [returnExchangeQuantity, setReturnExchangeQuantity] = useState(1);
-
-  const [selectedReplacementVariant, setSelectedReplacementVariant] =
-    useState("");
-  const [replacementVariantDetails, setReplacementVariantDetails] =
-    useState(null);
 
   // ================= ADDRESS FORM =================
 
@@ -160,18 +125,12 @@ function UserProfile() {
   const [passwordOtp, setPasswordOtp] = useState("");
   const [passwordOtpSent, setPasswordOtpSent] = useState(false);
 
-  const [myReviews, setMyReviews] = useState([]);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [reviewItem, setReviewItem] = useState(null);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewTitle, setReviewTitle] = useState("");
-  const [reviewComment, setReviewComment] = useState("");
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewError, setReviewError] = useState("");
-
   // ================= FORM LOADING =================
 
   const [formLoading, setFormLoading] = useState(false);
+
+  //.................referal..........
+  const [showReferral, setShowReferral] = useState(false);
 
   // ================= FETCH PROFILE =================
 
@@ -183,65 +142,6 @@ function UserProfile() {
       fetchAddresses();
     }
   }, []);
-
-  // ================= RESTORE EXCHANGE SELECTION =================
-
-  useEffect(() => {
-    const exchangeReturn = location.state?.exchangeReturn;
-
-    if (!exchangeReturn) {
-      return;
-    }
-
-    setShowAddresses(false);
-    setShowOrders(true);
-    setOrdersError("");
-
-    setReturnExchangeForm({
-      orderId: exchangeReturn.orderId,
-      itemIndex: exchangeReturn.itemIndex,
-      type: "Exchange",
-    });
-
-    setReturnExchangeReason(exchangeReturn.reason || "");
-
-    setSelectedReplacementVariant(exchangeReturn.replacementVariantId || "");
-
-    setReplacementVariantDetails({
-      color: exchangeReturn.replacementColor || "",
-      size: exchangeReturn.replacementSize ?? "",
-      price: exchangeReturn.replacementPrice,
-    });
-
-    setReturnExchangeError("");
-
-    const loadOrders = async () => {
-      try {
-        setOrdersLoading(true);
-
-        const response = await getMyOrders();
-
-        if (response.success) {
-          setOrders(response.orders || []);
-        } else {
-          setOrdersError(response.message || "Unable to load your orders.");
-        }
-      } catch (error) {
-        setOrdersError(
-          error.response?.data?.message || "Unable to load your orders.",
-        );
-      } finally {
-        setOrdersLoading(false);
-      }
-    };
-
-    loadOrders();
-
-    navigate("/profile", {
-      replace: true,
-      state: null,
-    });
-  }, [location.state, navigate]);
 
   // ================= NOTIFICATION FUNCTIONS =================
 
@@ -845,6 +745,7 @@ function UserProfile() {
   // ================= OPEN ADDRESSES =================
 
   const handleAddresses = () => {
+    setShowReferral(false);
     setShowOrders(false);
     setShowAddresses(true);
     fetchAddresses();
@@ -855,11 +756,13 @@ function UserProfile() {
   const handleProfile = () => {
     setShowOrders(false);
     setShowAddresses(false);
+    setShowReferral(false);
   };
 
   // ================= OPEN ORDERS =================
 
   const handleOrders = async () => {
+    setShowReferral(false);
     setShowAddresses(false);
     setShowOrders(true);
     setOrdersError("");
@@ -874,7 +777,6 @@ function UserProfile() {
       }
 
       setOrders(response.orders || []);
-      await loadMyReviews();
     } catch (error) {
       setOrdersError(
         error.response?.data?.message ||
@@ -886,7 +788,39 @@ function UserProfile() {
     }
   };
 
-  // ================= ADDRESS INPUT =================
+  //....................handle referral.........
+  const handleReferral = () => {
+    setShowOrders(false);
+    setShowAddresses(false);
+    setShowReferral(true);
+  };
+
+  const handleCopyReferralCode = async () => {
+    if (!user?.referralCode) {
+      showNotificationMessage(
+        "Referral Code Unavailable",
+        "Your referral code has not been generated yet.",
+        "error",
+      );
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(user.referralCode);
+
+      showNotificationMessage(
+        "Copied!",
+        "Your referral code has been copied.",
+        "success",
+      );
+    } catch (error) {
+      showNotificationMessage(
+        "Copy Failed",
+        "Unable to copy the code. Please copy it manually.",
+        "error",
+      );
+    }
+  };
 
   // ================= ADDRESS VALIDATION =================
 
@@ -1071,103 +1005,51 @@ function UserProfile() {
 
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
-    const handleAddressSubmit = async (e) => {
-      e.preventDefault();
 
-      if (!validateAddressForm()) {
-        return;
-      }
-
-      try {
-        let data;
-
-        const cleanedAddress = {
-          ...addressForm,
-          fullName: addressForm.fullName.trim(),
-          phone: addressForm.phone.trim(),
-          addressLine: addressForm.addressLine.trim(),
-          city: addressForm.city.trim(),
-          state: addressForm.state.trim(),
-          pincode: addressForm.pincode.trim(),
-        };
-
-        if (editingAddressId) {
-          data = await updateAddress(editingAddressId, cleanedAddress);
-        } else {
-          data = await addAddress(cleanedAddress);
-        }
-
-        if (data.success) {
-          const wasEditing = Boolean(editingAddressId);
-
-          setShowAddressForm(false);
-          setEditingAddressId(null);
-          resetAddressForm();
-          setAddressErrors({});
-          setAddressTouched({});
-
-          fetchAddresses();
-
-          showNotificationMessage(
-            wasEditing ? "Address Updated" : "Address Added",
-            data.message ||
-              (wasEditing
-                ? "Your address has been updated successfully."
-                : "Your address has been added successfully."),
-            "success",
-          );
-        } else {
-          showNotificationMessage(
-            "Address Error",
-            data.message || "Unable to save address.",
-            "error",
-          );
-        }
-      } catch (error) {
-        console.error("Address submit error:", error);
-
-        showNotificationMessage(
-          "Something Went Wrong",
-          error.response?.data?.message ||
-            "Unable to save the address. Please try again.",
-          "error",
-        );
-      }
-    };
+    if (!validateAddressForm()) {
+      return;
+    }
 
     try {
-      let data;
+      const cleanedAddress = {
+        ...addressForm,
+        fullName: addressForm.fullName.trim(),
+        phone: addressForm.phone.trim(),
+        addressLine: addressForm.addressLine.trim(),
+        city: addressForm.city.trim(),
+        state: addressForm.state.trim(),
+        pincode: addressForm.pincode.trim(),
+      };
 
-      if (editingAddressId) {
-        data = await updateAddress(editingAddressId, addressForm);
-      } else {
-        data = await addAddress(addressForm);
-      }
+      const wasEditing = Boolean(editingAddressId);
 
-      if (data.success) {
-        const wasEditing = Boolean(editingAddressId);
+      const data = wasEditing
+        ? await updateAddress(editingAddressId, cleanedAddress)
+        : await addAddress(cleanedAddress);
 
-        setShowAddressForm(false);
-        setEditingAddressId(null);
-        resetAddressForm();
-
-        fetchAddresses();
-
-        showNotificationMessage(
-          wasEditing ? "Address Updated" : "Address Added",
-          data.message ||
-            (wasEditing
-              ? "Your address has been updated successfully."
-              : "Your address has been added successfully."),
-          "success",
-        );
-      } else {
+      if (!data.success) {
         showNotificationMessage(
           "Address Error",
           data.message || "Unable to save address.",
           "error",
         );
+        return;
       }
+
+      setShowAddressForm(false);
+      setEditingAddressId(null);
+      resetAddressForm();
+
+      await fetchAddresses();
+
+      showNotificationMessage(
+        wasEditing ? "Address Updated" : "Address Added",
+        data.message ||
+          (wasEditing
+            ? "Your address has been updated successfully."
+            : "Your address has been added successfully."),
+        "success",
+      );
     } catch (error) {
       console.error("Address submit error:", error);
 
@@ -1295,228 +1177,6 @@ function UserProfile() {
       "Logout",
     );
   };
-
-  // ================= RETURN AND EXCHANGE =================
-
-  const handleReturnExchangeClick = (orderId, itemIndex, type) => {
-    setReturnExchangeQuantity(1);
-    setReturnExchangeForm({
-      orderId,
-      itemIndex,
-      type,
-    });
-
-    setReturnExchangeReason("");
-    setReturnExchangeError("");
-    setSelectedReplacementVariant("");
-    setReplacementVariantDetails(null);
-  };
-
-  const handleReturnExchangeSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!returnExchangeReason.trim()) {
-      setReturnExchangeError("Please enter a reason.");
-      return;
-    }
-
-    if (returnExchangeForm.type === "Exchange" && !selectedReplacementVariant) {
-      setReturnExchangeError(
-        "Please choose a replacement color and size first.",
-      );
-      return;
-    }
-
-    try {
-      setReturnExchangeLoading(true);
-      setReturnExchangeError("");
-
-      const response = await requestReturnExchange(
-        returnExchangeForm.orderId,
-        returnExchangeForm.itemIndex,
-        returnExchangeForm.type,
-        returnExchangeReason.trim(),
-        returnExchangeForm.type === "Exchange"
-          ? selectedReplacementVariant
-          : null,
-        Number(returnExchangeQuantity),
-      );
-
-      if (!response.success) {
-        throw new Error(response.message || "Unable to submit your request.");
-      }
-
-      const updatedOrders = await getMyOrders();
-
-      if (updatedOrders.success) {
-        setOrders(updatedOrders.orders || []);
-      }
-
-      const submittedType = returnExchangeForm.type;
-
-      setReturnExchangeForm(null);
-      setReturnExchangeReason("");
-      setSelectedReplacementVariant("");
-      setReplacementVariantDetails(null);
-      setReturnExchangeError("");
-
-      showNotificationMessage(
-        "Request Submitted",
-        response.message || `${submittedType} request submitted successfully.`,
-        "success",
-      );
-    } catch (error) {
-      setReturnExchangeError(
-        error.response?.data?.message ||
-          error.message ||
-          "Unable to submit your request.",
-      );
-    } finally {
-      setReturnExchangeLoading(false);
-    }
-  };
-
-  // ================= CANCEL ORDER =================
-
-  const handleCancelOrder = (orderId, itemIndex) => {
-    showConfirmationMessage(
-      "Cancel Product",
-      "Are you sure you want to cancel this entire product from your order?",
-      async () => {
-        try {
-          const response = await cancelOrder(orderId, itemIndex);
-
-          if (!response.success) {
-            throw new Error(response.message || "Unable to cancel product.");
-          }
-
-          const updatedOrders = await getMyOrders();
-
-          if (updatedOrders.success) {
-            setOrders(updatedOrders.orders || []);
-          }
-
-          showNotificationMessage(
-            "Product Cancelled",
-            response.message || "The product was cancelled successfully.",
-          );
-        } catch (error) {
-          showNotificationMessage(
-            "Cancellation Failed",
-            error.response?.data?.message ||
-              error.message ||
-              "Unable to cancel product.",
-            "error",
-          );
-        }
-      },
-      "Yes, Cancel Product",
-    );
-  };
-
-  // ================= PRODUCT REVIEWS =================
-
-  const loadMyReviews = async () => {
-    try {
-      const response = await getMyReviews();
-      setMyReviews(response.reviews || []);
-    } catch (error) {
-      console.error("Unable to load reviews:", error);
-    }
-  };
-
-  const openReviewModal = (order, item, itemIndex) => {
-    setReviewItem({
-      orderId: order._id,
-      itemIndex,
-      productId: item.productId,
-      productName: item.productName,
-      image: item.image,
-    });
-
-    setReviewRating(0);
-    setReviewTitle("");
-    setReviewComment("");
-    setReviewError("");
-    setShowReviewModal(true);
-  };
-
-  const closeReviewModal = () => {
-    if (reviewLoading) return;
-
-    setShowReviewModal(false);
-    setReviewItem(null);
-    setReviewRating(0);
-    setReviewTitle("");
-    setReviewComment("");
-    setReviewError("");
-  };
-
-  const handleReviewSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!reviewItem) return;
-
-    if (reviewRating < 1 || reviewRating > 5) {
-      setReviewError("Please select a star rating.");
-      return;
-    }
-
-    if (!reviewComment.trim()) {
-      setReviewError("Please write your review.");
-      return;
-    }
-
-    try {
-      setReviewLoading(true);
-      setReviewError("");
-
-      const response = await createReview({
-        productId: reviewItem.productId?._id || reviewItem.productId,
-        orderId: reviewItem.orderId,
-        rating: reviewRating,
-        title: reviewTitle.trim(),
-        comment: reviewComment.trim(),
-      });
-
-      if (!response.success) {
-        throw new Error(response.message || "Unable to submit your review.");
-      }
-
-      await loadMyReviews();
-
-      setShowReviewModal(false);
-      setReviewItem(null);
-      setReviewRating(0);
-      setReviewTitle("");
-      setReviewComment("");
-
-      showNotificationMessage(
-        "Review Submitted",
-        response.message || "Thank you for reviewing this product!",
-        "success",
-      );
-    } catch (error) {
-      setReviewError(
-        error.response?.data?.message ||
-          error.message ||
-          "Unable to submit your review. Please try again.",
-      );
-    } finally {
-      setReviewLoading(false);
-    }
-  };
-
-  const hasReviewedProduct = (productId) => {
-    const productIdString = String(productId?._id || productId || "");
-
-    return myReviews.some(
-      (review) =>
-        String(review.productId?._id || review.productId || "") ===
-        productIdString,
-    );
-  };
-
   // ================= LOADING =================
 
   if (loading) {
@@ -1536,7 +1196,7 @@ function UserProfile() {
 
         <button
           className={`sidebar-item ${
-            !showAddresses && !showOrders ? "active" : ""
+            !showAddresses && !showOrders && !showReferral ? "active" : ""
           }`}
           onClick={handleProfile}
         >
@@ -1558,9 +1218,7 @@ function UserProfile() {
         </button>
 
         <button
-          className={`sidebar-item ${
-            showAddresses && !showOrders ? "active" : ""
-          }`}
+          className={`sidebar-item ${showAddresses ? "active" : ""}`}
           onClick={handleAddresses}
         >
           <MapPin size={18} />
@@ -1570,6 +1228,14 @@ function UserProfile() {
         <button className="sidebar-item" onClick={() => navigate("/wallet")}>
           <Wallet size={18} />
           <span>My Wallet</span>
+        </button>
+
+        <button
+          className={`sidebar-item ${showReferral ? "active" : ""}`}
+          onClick={handleReferral}
+        >
+          <Gift size={18} />
+          <span>My Referral</span>
         </button>
 
         <button className="sidebar-item" onClick={openChangePassword}>
@@ -1664,511 +1330,6 @@ function UserProfile() {
                               <p>Ordered Quantity: {item.quantity}</p>
                             </div>
                           </div>
-
-                          {order.orderStatus === "Delivered" &&
-                            order.deliveredAt &&
-                            item.productId &&
-                            !hasReviewedProduct(item.productId) && (
-                              <button
-                                type="button"
-                                className="add-review-btn"
-                                onClick={() =>
-                                  openReviewModal(order, item, index)
-                                }
-                              >
-                                <Star size={16} />
-                                Add Review
-                              </button>
-                            )}
-
-                          {/* CANCEL PRODUCT */}
-                          {["Placed", "Confirmed"].includes(
-                            order.orderStatus,
-                          ) &&
-                            (() => {
-                              const alreadyCancelled = Number(
-                                item.cancelledQuantity || 0,
-                              );
-                              const alreadyReturned = Number(
-                                item.returnedQuantity || 0,
-                              );
-                              const alreadyExchanged = Number(
-                                item.exchangedQuantity || 0,
-                              );
-
-                              const pendingQuantity = (
-                                item.itemActionRequests || []
-                              )
-                                .filter(
-                                  (request) =>
-                                    !["Rejected", "Completed"].includes(
-                                      request.status,
-                                    ),
-                                )
-                                .reduce(
-                                  (total, request) =>
-                                    total + Number(request.quantity || 0),
-                                  0,
-                                );
-
-                              const availableQuantity = Math.max(
-                                0,
-                                Number(item.quantity || 0) -
-                                  alreadyCancelled -
-                                  alreadyReturned -
-                                  alreadyExchanged -
-                                  pendingQuantity,
-                              );
-
-                              if (availableQuantity <= 0) {
-                                return (
-                                  <p className="return-exchange-status">
-                                    No remaining quantity is available to
-                                    cancel.
-                                  </p>
-                                );
-                              }
-
-                              return (
-                                <div className="return-exchange-actions">
-                                  <button
-                                    type="button"
-                                    className="edit-profile-btn"
-                                    onClick={() =>
-                                      handleCancelOrder(order._id, index)
-                                    }
-                                  >
-                                    Cancel Product
-                                  </button>
-                                </div>
-                              );
-                            })()}
-
-                          {/* RETURN / EXCHANGE STATUS AND ACTIONS */}
-                          {(() => {
-                            const requests = item.itemActionRequests || [];
-
-                            const hasRejectedReturn = requests.some(
-                              (request) =>
-                                request.type === "Return" &&
-                                request.status === "Rejected",
-                            );
-
-                            const hasLegacyRequest =
-                              item.returnExchange?.status &&
-                              item.returnExchange.status !== "Not Requested";
-
-                            const hasActiveRequest = requests.some(
-                              (request) =>
-                                ["Return", "Exchange"].includes(request.type) &&
-                                request.status !== "Rejected",
-                            );
-
-                            const hasCompletedReturnOrExchange =
-                              Number(item.returnedQuantity || 0) > 0 ||
-                              Number(item.exchangedQuantity || 0) > 0;
-
-                            const unavailableForRequest =
-                              hasLegacyRequest ||
-                              hasActiveRequest ||
-                              hasCompletedReturnOrExchange;
-
-                            if (
-                              Number(item.cancelledQuantity || 0) >=
-                              Number(item.quantity || 0)
-                            ) {
-                              return (
-                                <p className="return-exchange-status">
-                                  This product has been cancelled.
-                                </p>
-                              );
-                            }
-
-                            if (requests.length > 0) {
-                              return (
-                                <div className="item-action-tracking">
-                                  <h4>Return / Exchange Tracking</h4>
-
-                                  {requests.map((request, requestIndex) => (
-                                    <div
-                                      className="return-exchange-status"
-                                      key={request._id || requestIndex}
-                                    >
-                                      <p>
-                                        <strong>{request.type}</strong> —{" "}
-                                        {request.status}
-                                      </p>
-                                      {request.reason && (
-                                        <p>Reason: {request.reason}</p>
-                                      )}
-                                      {request.requestedAt && (
-                                        <p>
-                                          Requested on:{" "}
-                                          {new Date(
-                                            request.requestedAt,
-                                          ).toLocaleDateString()}
-                                        </p>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            }
-
-                            if (hasLegacyRequest) {
-                              return (
-                                <p className="return-exchange-status">
-                                  {item.returnExchange.type} Status:{" "}
-                                  {item.returnExchange.status}
-                                </p>
-                              );
-                            }
-
-                            if (hasCompletedReturnOrExchange) {
-                              return (
-                                <p className="return-exchange-status">
-                                  This product has already been returned or
-                                  exchanged.
-                                </p>
-                              );
-                            }
-
-                            if (unavailableForRequest) return null;
-
-                            if (order.orderStatus !== "Delivered") return null;
-
-                            return (
-                              <div>
-                                <div className="return-exchange-actions">
-                                  {isReturnExchangeAvailable(order, "Return") &&
-                                    !(item.itemActionRequests || []).some(
-                                      (request) =>
-                                        request.type === "Return" &&
-                                        request.status === "Rejected",
-                                    ) && (
-                                      <button
-                                        type="button"
-                                        className="edit-profile-btn"
-                                        onClick={() =>
-                                          handleReturnExchangeClick(
-                                            order._id,
-                                            index,
-                                            "Return",
-                                          )
-                                        }
-                                      >
-                                        Return
-                                      </button>
-                                    )}
-
-                                  {isReturnExchangeAvailable(
-                                    order,
-                                    "Exchange",
-                                  ) && (
-                                    <button
-                                      type="button"
-                                      className="edit-profile-btn"
-                                      onClick={() =>
-                                        handleReturnExchangeClick(
-                                          order._id,
-                                          index,
-                                          "Exchange",
-                                        )
-                                      }
-                                    >
-                                      Exchange
-                                    </button>
-                                  )}
-                                </div>
-
-                                {order.deliveredAt &&
-                                  !isReturnExchangeAvailable(order, "Return") &&
-                                  !isReturnExchangeAvailable(
-                                    order,
-                                    "Exchange",
-                                  ) && (
-                                    <p className="return-exchange-status">
-                                      Return and exchange period has expired.
-                                    </p>
-                                  )}
-                              </div>
-                            );
-                          })()}
-
-                          {/* RETURN / EXCHANGE REQUEST MODAL */}
-                          {returnExchangeForm?.orderId === order._id &&
-                            returnExchangeForm?.itemIndex === index && (
-                              <div
-                                className="return-modal-overlay"
-                                onClick={() => {
-                                  if (!returnExchangeLoading) {
-                                    setReturnExchangeForm(null);
-                                    setReturnExchangeReason("");
-                                    setReturnExchangeError("");
-                                    setSelectedReplacementVariant("");
-                                    setReplacementVariantDetails(null);
-                                  }
-                                }}
-                              >
-                                <form
-                                  className="return-modal"
-                                  onSubmit={handleReturnExchangeSubmit}
-                                  onClick={(event) => event.stopPropagation()}
-                                  role="dialog"
-                                  aria-modal="true"
-                                  aria-labelledby="return-modal-title"
-                                >
-                                  {/* Modal Header */}
-                                  <div className="return-modal-header">
-                                    <div>
-                                      <p className="return-modal-eyebrow">
-                                        SOLESTYLE
-                                      </p>
-
-                                      <h2 id="return-modal-title">
-                                        {returnExchangeForm.type === "Return"
-                                          ? "Return Product"
-                                          : "Exchange Product"}
-                                      </h2>
-
-                                      <p className="return-modal-subtitle">
-                                        {returnExchangeForm.type === "Return"
-                                          ? "We're sorry this product didn't work out. Please share the details below."
-                                          : "Choose your replacement and tell us why you'd like to exchange this product."}
-                                      </p>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      className="return-modal-close"
-                                      aria-label="Close modal"
-                                      disabled={returnExchangeLoading}
-                                      onClick={() => {
-                                        setReturnExchangeForm(null);
-                                        setReturnExchangeReason("");
-                                        setReturnExchangeError("");
-                                        setSelectedReplacementVariant("");
-                                        setReplacementVariantDetails(null);
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-
-                                  {/* Modal Content */}
-                                  <div className="return-modal-body">
-                                    <div className="return-modal-product">
-                                      {item.image && (
-                                        <img
-                                          src={item.image}
-                                          alt={item.productName}
-                                          className="return-modal-product-image"
-                                        />
-                                      )}
-
-                                      <div>
-                                        <strong>{item.productName}</strong>
-                                        <p>
-                                          Color: {item.color || "N/A"} | Size:{" "}
-                                          {item.size || "N/A"}
-                                        </p>
-                                        <p>Ordered quantity: {item.quantity}</p>
-                                      </div>
-                                    </div>
-
-                                    {/* Quantity Selection */}
-                                    <div className="return-modal-field">
-                                      <label htmlFor="return-exchange-quantity">
-                                        Quantity to{" "}
-                                        {returnExchangeForm.type === "Return"
-                                          ? "return"
-                                          : "exchange"}
-                                      </label>
-
-                                      <select
-                                        id="return-exchange-quantity"
-                                        value={returnExchangeQuantity}
-                                        onChange={(event) =>
-                                          setReturnExchangeQuantity(
-                                            Number(event.target.value),
-                                          )
-                                        }
-                                        disabled={returnExchangeLoading}
-                                      >
-                                        {Array.from(
-                                          {
-                                            length: Math.max(
-                                              0,
-                                              Number(item.quantity || 0) -
-                                                Number(
-                                                  item.cancelledQuantity || 0,
-                                                ) -
-                                                Number(
-                                                  item.returnedQuantity || 0,
-                                                ) -
-                                                Number(
-                                                  item.exchangedQuantity || 0,
-                                                ),
-                                            ),
-                                          },
-                                          (_, index) => index + 1,
-                                        ).map((quantity) => (
-                                          <option
-                                            key={quantity}
-                                            value={quantity}
-                                          >
-                                            {quantity}{" "}
-                                            {quantity === 1 ? "unit" : "units"}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-
-                                    {/* Exchange Replacement Selection */}
-                                    {returnExchangeForm.type === "Exchange" && (
-                                      <div className="return-modal-replacement">
-                                        <h3>Replacement product</h3>
-
-                                        {replacementVariantDetails ? (
-                                          <div className="selected-replacement">
-                                            <p>
-                                              <strong>
-                                                Selected replacement
-                                              </strong>
-                                            </p>
-
-                                            <p>
-                                              Color:{" "}
-                                              {replacementVariantDetails.color ||
-                                                "N/A"}
-                                            </p>
-
-                                            <p>
-                                              Size:{" "}
-                                              {replacementVariantDetails.size ||
-                                                "N/A"}
-                                            </p>
-
-                                            <p>
-                                              Price: ₹
-                                              {Number(
-                                                replacementVariantDetails.price,
-                                              ).toLocaleString("en-IN")}
-                                            </p>
-                                          </div>
-                                        ) : (
-                                          <p className="replacement-selection-hint">
-                                            No replacement selected yet.
-                                          </p>
-                                        )}
-
-                                        <button
-                                          type="button"
-                                          className="edit-profile-btn"
-                                          disabled={returnExchangeLoading}
-                                          onClick={() =>
-                                            navigate(
-                                              `/products/${item.productId}`,
-                                              {
-                                                state: {
-                                                  exchangeContext: {
-                                                    orderId: order._id,
-                                                    itemIndex: index,
-                                                    originalVariantId:
-                                                      item.variantId,
-                                                    originalPrice: item.price,
-                                                    originalColor: item.color,
-                                                    productId: item.productId,
-                                                    reason:
-                                                      returnExchangeReason,
-                                                  },
-                                                },
-                                              },
-                                            )
-                                          }
-                                        >
-                                          {replacementVariantDetails
-                                            ? "Change Replacement"
-                                            : "Choose Replacement"}
-                                        </button>
-                                      </div>
-                                    )}
-
-                                    {/* Return / Exchange Reason */}
-                                    <div className="return-modal-field">
-                                      <label htmlFor="return-exchange-reason">
-                                        Reason for{" "}
-                                        {returnExchangeForm.type.toLowerCase()}
-                                      </label>
-
-                                      <textarea
-                                        id="return-exchange-reason"
-                                        value={returnExchangeReason}
-                                        onChange={(event) => {
-                                          setReturnExchangeReason(
-                                            event.target.value,
-                                          );
-                                          setReturnExchangeError("");
-                                        }}
-                                        placeholder={
-                                          returnExchangeForm.type === "Return"
-                                            ? "Please tell us why you'd like to return this product..."
-                                            : "Please tell us why you'd like to exchange this product..."
-                                        }
-                                        rows={4}
-                                        required
-                                        disabled={returnExchangeLoading}
-                                      />
-                                    </div>
-
-                                    {returnExchangeError && (
-                                      <p
-                                        className="return-modal-error"
-                                        role="alert"
-                                      >
-                                        {returnExchangeError}
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  {/* Modal Footer */}
-                                  <div className="return-modal-footer">
-                                    <button
-                                      type="button"
-                                      className="return-modal-cancel"
-                                      onClick={() => {
-                                        setReturnExchangeForm(null);
-                                        setReturnExchangeReason("");
-                                        setReturnExchangeError("");
-                                        setSelectedReplacementVariant("");
-                                        setReplacementVariantDetails(null);
-                                      }}
-                                      disabled={returnExchangeLoading}
-                                    >
-                                      Cancel
-                                    </button>
-
-                                    <button
-                                      type="submit"
-                                      className="edit-profile-btn return-modal-submit"
-                                      disabled={
-                                        returnExchangeLoading ||
-                                        !returnExchangeReason.trim() ||
-                                        (returnExchangeForm.type ===
-                                          "Exchange" &&
-                                          !selectedReplacementVariant)
-                                      }
-                                    >
-                                      {returnExchangeLoading
-                                        ? "Submitting..."
-                                        : returnExchangeForm.type === "Return"
-                                          ? "Submit Return Request"
-                                          : "Submit Exchange Request"}
-                                    </button>
-                                  </div>
-                                </form>
-                              </div>
-                            )}
                         </div>
                       ))}
                     </div>
@@ -2235,6 +1396,42 @@ function UserProfile() {
               </div>
             )}
           </>
+        ) : showReferral ? (
+          <section className="profile-card referral-card">
+            <div className="referral-heading">
+              <Gift size={32} />
+              <div>
+                <h1>My Referral</h1>
+                <p>
+                  Invite your friends to SOLESTYLE using your referral code.
+                </p>
+              </div>
+            </div>
+
+            <div className="referral-code-box">
+              <label>Your Referral Code</label>
+
+              <div className="referral-code-row">
+                <strong>
+                  {user?.referralCode || "Code not generated yet"}
+                </strong>
+
+                <button
+                  type="button"
+                  className="edit-profile-btn"
+                  disabled={!user?.referralCode}
+                  onClick={handleCopyReferralCode}
+                >
+                  Copy Code
+                </button>
+              </div>
+            </div>
+
+            <p className="referral-note">
+              Share this code with your friends when they register for
+              SOLESTYLE.
+            </p>
+          </section>
         ) : !showAddresses ? (
           <>
             <h1>My Profile</h1>
@@ -2882,145 +2079,6 @@ function UserProfile() {
                 </div>
               </form>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* ================= ADD REVIEW MODAL ================= */}
-
-      {showReviewModal && reviewItem && (
-        <div className="review-modal-overlay">
-          <div
-            className="review-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="review-modal-title"
-          >
-            <button
-              type="button"
-              className="review-modal-close"
-              onClick={closeReviewModal}
-              disabled={reviewLoading}
-              aria-label="Close review modal"
-            >
-              <X size={20} />
-            </button>
-
-            <div className="review-modal-heading">
-              <Star size={26} />
-              <h2 id="review-modal-title">Write a Review</h2>
-              <p>Share your experience with this product.</p>
-            </div>
-
-            <div className="review-modal-product">
-              {reviewItem.image && (
-                <img src={reviewItem.image} alt={reviewItem.productName} />
-              )}
-              <strong>{reviewItem.productName}</strong>
-            </div>
-
-            <form onSubmit={handleReviewSubmit}>
-              <label className="review-form-label">
-                Your Rating <span>*</span>
-              </label>
-
-              <div
-                className="review-star-selector"
-                role="radiogroup"
-                aria-label="Product rating"
-              >
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    role="radio"
-                    aria-checked={reviewRating === star}
-                    aria-label={`${star} star${star > 1 ? "s" : ""}`}
-                    className={
-                      star <= reviewRating
-                        ? "review-star selected"
-                        : "review-star"
-                    }
-                    onClick={() => setReviewRating(star)}
-                    disabled={reviewLoading}
-                  >
-                    <Star
-                      size={30}
-                      fill={star <= reviewRating ? "currentColor" : "none"}
-                    />
-                  </button>
-                ))}
-              </div>
-
-              {reviewRating > 0 && (
-                <p className="review-rating-label">
-                  {
-                    ["", "Poor", "Fair", "Good", "Very Good", "Excellent"][
-                      reviewRating
-                    ]
-                  }
-                </p>
-              )}
-
-              <label className="review-form-label" htmlFor="review-title">
-                Review Title <span className="review-optional">(Optional)</span>
-              </label>
-
-              <input
-                id="review-title"
-                type="text"
-                maxLength={100}
-                placeholder="Summarize your experience"
-                value={reviewTitle}
-                onChange={(event) => setReviewTitle(event.target.value)}
-                disabled={reviewLoading}
-              />
-
-              <label className="review-form-label" htmlFor="review-comment">
-                Your Review <span>*</span>
-              </label>
-
-              <textarea
-                id="review-comment"
-                rows={4}
-                maxLength={1000}
-                minLength={3}
-                placeholder="Tell us what you liked about this product..."
-                value={reviewComment}
-                onChange={(event) => setReviewComment(event.target.value)}
-                disabled={reviewLoading}
-                required
-              />
-
-              <p className="review-character-count">
-                {reviewComment.length}/1000 characters
-              </p>
-
-              {reviewError && (
-                <p className="review-form-error" role="alert">
-                  {reviewError}
-                </p>
-              )}
-
-              <div className="review-modal-actions">
-                <button
-                  type="button"
-                  className="review-cancel-btn"
-                  onClick={closeReviewModal}
-                  disabled={reviewLoading}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="review-submit-btn"
-                  disabled={reviewLoading}
-                >
-                  {reviewLoading ? "Submitting..." : "Submit Review"}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

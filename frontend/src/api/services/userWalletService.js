@@ -11,3 +11,13 @@ export const getWalletTransactions = async () => {
   const response = await api.get("/wallet/transactions");
   return response.data;
 };
+
+export const createWalletTopUp = async (amount) => {
+  const response = await api.post("/wallet/top-up/create", { amount });
+  return response.data;
+};
+
+export const verifyWalletTopUp = async (paymentDetails) => {
+  const response = await api.post("/wallet/top-up/verify", paymentDetails);
+  return response.data;
+};

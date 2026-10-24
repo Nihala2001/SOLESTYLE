@@ -14,6 +14,7 @@ import {
   createOrder,
   createRazorpayOrder,
   verifyRazorpayPayment,
+  getCheckoutDiscountPreview,
 } from "../api/services/userOrderService";
 import { getAvailableCoupons } from "../api/services/userCouponService";
 import { getWallet } from "../api/services/userWalletService";
@@ -68,6 +69,10 @@ function Checkout() {
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
+
+  const [discountPreview, setDiscountPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
 
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletLoading, setWalletLoading] = useState(false);
@@ -177,9 +182,77 @@ function Checkout() {
     loadCoupons();
   }, []);
 
+  // ================= PREVIEW CHECKOUT DISCOUNTS =================
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadDiscountPreview = async () => {
+      if (loading || items.length === 0) {
+        setDiscountPreview(null);
+        setPreviewError(false);
+        return;
+      }
+
+      if (isBuyNow && !buyNowItem?.variantId) {
+        setDiscountPreview(null);
+        return;
+      }
+
+      try {
+        setPreviewLoading(true);
+        setPreviewError(false);
+
+        const response = await getCheckoutDiscountPreview(
+          appliedCoupon?.code || null,
+          isBuyNow ? buyNowItem.variantId : null,
+        );
+
+        if (!isMounted) return;
+
+        if (!response.success) {
+          throw new Error(
+            response.message || "Unable to calculate checkout discounts.",
+          );
+        }
+
+        setDiscountPreview(response);
+      } catch (error) {
+        if (!isMounted) return;
+
+        setDiscountPreview(null);
+        setPreviewError(true);
+
+        showNotification(
+          "Unable to calculate discounts",
+          error.response?.data?.message ||
+            error.message ||
+            "Please refresh checkout and try again.",
+          "error",
+        );
+      } finally {
+        if (isMounted) {
+          setPreviewLoading(false);
+        }
+      }
+    };
+
+    loadDiscountPreview();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    loading,
+    items.length,
+    isBuyNow,
+    buyNowItem?.variantId,
+    appliedCoupon?.code,
+  ]);
+
   // ================= PRICE CALCULATIONS =================
 
-  const subtotal = items.reduce(
+  const localSubtotal = items.reduce(
     (total, item) =>
       total + Number(item.price || 0) * Number(item.quantity || 0),
     0,
@@ -187,22 +260,34 @@ function Checkout() {
 
   const shippingFee = 0;
 
-  const discount = appliedCoupon
-    ? Math.min(
-        subtotal,
-        appliedCoupon.discountType === "Percentage"
-          ? Math.min(
-              (subtotal * Number(appliedCoupon.discountValue)) / 100,
-              appliedCoupon.maxDiscount ?? Infinity,
-            )
-          : Number(appliedCoupon.discountValue || 0),
-      )
-    : 0;
+  // Prefer server-calculated amounts when the preview is available.
+  const subtotal =
+    discountPreview !== null ? Number(discountPreview.subtotal) : localSubtotal;
 
-  const total = Math.max(0, subtotal - discount + shippingFee);
+  const discount = discountPreview
+    ? Number(discountPreview.couponDiscount || 0)
+    : appliedCoupon
+      ? Math.min(
+          subtotal,
+          appliedCoupon.discountType === "Percentage"
+            ? Math.min(
+                (subtotal * Number(appliedCoupon.discountValue)) / 100,
+                appliedCoupon.maxDiscount ?? Infinity,
+              )
+            : Number(appliedCoupon.discountValue || 0),
+        )
+      : 0;
+
+  const referralDiscount = Number(discountPreview?.referralDiscount || 0);
+
+  const referralEligible = Boolean(discountPreview?.referralEligible);
+
+  const total =
+    discountPreview !== null
+      ? Math.max(0, Number(discountPreview.totalAmount || 0) + shippingFee)
+      : Math.max(0, subtotal - discount + shippingFee);
 
   const hasSufficientWalletBalance = walletBalance >= total;
-
   // ================= APPLY COUPON =================
 
   const handleApplyCoupon = () => {
@@ -398,6 +483,8 @@ function Checkout() {
                 paymentResponse,
               );
 
+              window.dispatchEvent(new Event("cartUpdated"));
+              
               if (
                 !verificationResponse.success ||
                 !verificationResponse.order ||
@@ -455,8 +542,9 @@ function Checkout() {
 
       // ================= COD AND WALLET =================
 
-      setCompletedOrder(order);
-      setItems([]);
+setCompletedOrder(order);
+setItems([]);
+window.dispatchEvent(new Event("cartUpdated"));
 
       if (paymentMethod === "WALLET") {
         if (order.wallet?.balance !== undefined) {
@@ -999,6 +1087,20 @@ function Checkout() {
             </div>
           )}
 
+          {(referralEligible || referralDiscount > 0) && (
+            <div className="checkout-price-row">
+              <span>Referral Discount (10%)</span>
+              <span style={{ color: "green" }}>
+                -₹{referralDiscount.toFixed(2)}
+              </span>
+            </div>
+          )}
+
+          {previewLoading && (
+            <p style={{ fontSize: "13px", color: "#777" }}>
+              Updating discounts...
+            </p>
+          )}
           <div className="checkout-price-row checkout-total-row">
             <strong>Total</strong>
             <strong>₹{total.toFixed(2)}</strong>
@@ -1033,6 +1135,8 @@ function Checkout() {
             onClick={handlePlaceOrder}
             disabled={
               placingOrder ||
+              previewLoading ||
+              previewError ||
               items.length === 0 ||
               addresses.length === 0 ||
               (isBuyNow && !buyNowItem?.variantId) ||

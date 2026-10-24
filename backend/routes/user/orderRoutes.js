@@ -6,6 +6,7 @@ const authMiddleware = require("../../middleware/user/authMiddleware");
 const {
   createOrder,
   getMyOrders,
+  getCheckoutDiscountPreview,
   requestReturnExchange,
   cancelOrder,
 } = require("../../controllers/user/orderController");
@@ -17,12 +18,21 @@ const {
 const {
   createRazorpayOrder,
   verifyRazorpayPayment,
+  expireUpiOrder,
 } = require("../../controllers/user/razorpayController");
+
+
 
 router.post("/", authMiddleware, createOrder);
 router.get("/my-orders", authMiddleware, getMyOrders);
 router.post("/return-exchange", authMiddleware, requestReturnExchange);
 router.patch("/cancel", authMiddleware, cancelOrder);
+router.post(
+  "/preview-discounts",
+  authMiddleware,
+  getCheckoutDiscountPreview
+);
+
 router.get("/:orderId/invoice", authMiddleware, downloadInvoice);
 
 router.post(
@@ -37,4 +47,9 @@ router.post(
   verifyRazorpayPayment
 );
 
+router.post(
+  "/:orderId/razorpay/expire",
+  authMiddleware,
+  expireUpiOrder
+);
 module.exports = router;

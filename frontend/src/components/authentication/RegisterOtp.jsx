@@ -85,7 +85,7 @@ function RegisterOtp() {
 
     // After successful OTP verification, go to login
     if (notificationTitle === "OTP Verified") {
-      navigate("/login");
+      navigate("/login", { replace: true });
     }
   };
 

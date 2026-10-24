@@ -7,6 +7,7 @@ const Variant = require("../../models/Variant");
 const Coupon = require("../../models/Coupon");
 const Wallet = require("../../models/Wallet");
 const Product = require("../../models/Product");
+const User = require("../../models/User");
 
 const { getCart } = require("../../services/user/cartService");
 const {
@@ -22,10 +23,40 @@ const createOrder = async (req, res) => {
     let walletDebitTransactionId = null;
     let walletBalanceAfterDebit = null;
     let totalAmount = 0;
+    let referralDiscountClaimed = false;
+    let referralDiscount = 0;
 
     // Track stock deducted during checkout so it can be restored
     // if order creation fails.
     const reservedStock = [];
+
+    // Release the first-order referral discount claim if checkout fails.
+    const releaseReferralDiscountClaim = async () => {
+        if (!referralDiscountClaimed || orderCreated) {
+            return;
+        }
+
+        try {
+            await User.updateOne(
+                {
+                    _id: req.userId,
+                    referralFirstOrderDiscountUsed: true,
+                },
+                {
+                    $set: {
+                        referralFirstOrderDiscountUsed: false,
+                    },
+                }
+            );
+
+            referralDiscountClaimed = false;
+        } catch (error) {
+            console.error(
+                "Failed to release first-order referral discount claim:",
+                error
+            );
+        }
+    };
 
     try {
         const {
@@ -70,7 +101,6 @@ const createOrder = async (req, res) => {
         const isBuyNow = Boolean(buyNowVariantId);
 
         if (isBuyNow) {
-            // Validate the selected variant ID.
             if (!mongoose.isValidObjectId(buyNowVariantId)) {
                 return res.status(400).json({
                     success: false,
@@ -78,7 +108,6 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            // Find an active variant with available stock.
             const variant = await Variant.findOne({
                 _id: buyNowVariantId,
                 isActive: true,
@@ -93,7 +122,6 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            // Verify that the associated product is active.
             const product = await Product.findOne({
                 _id: variant.productId,
                 isActive: true,
@@ -106,8 +134,6 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            // Buy Now always orders one unit of the selected variant.
-            // The customer's cart remains unchanged.
             checkoutItems = [
                 {
                     variantId: variant._id,
@@ -119,7 +145,6 @@ const createOrder = async (req, res) => {
                 },
             ];
         } else {
-            // Normal checkout uses the existing cart.
             const cart = await getCart(req.userId);
 
             if (!cart || !cart.items || cart.items.length === 0) {
@@ -151,7 +176,6 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            // Recheck the variant and its stock before creating the order.
             const variant = await Variant.findOne({
                 _id: item.variantId,
                 isActive: true,
@@ -164,7 +188,6 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            // Calculate the current effective price on the server.
             const pricing = await getVariantPricing(
                 variant,
                 item.product
@@ -270,10 +293,9 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            discount =
-                Math.round(
-                    Math.min(subtotal, Math.max(0, discount)) * 100
-                ) / 100;
+            discount = Math.round(
+                Math.min(subtotal, Math.max(0, discount)) * 100
+            ) / 100;
 
             // Atomically reserve one use of this coupon.
             const reservedCoupon = await Coupon.findOneAndUpdate(
@@ -309,11 +331,74 @@ const createOrder = async (req, res) => {
             validatedCouponCode = reservedCoupon.code;
         }
 
+        // ================= FIRST-ORDER REFERRAL DISCOUNT =================
+
+        // Only customers registered using a referral code qualify.
+        const referralUser = await User.findOne({
+            _id: req.userId,
+            referredBy: { $ne: null },
+        }).select("_id referredBy referralFirstOrderDiscountUsed");
+
+        if (referralUser) {
+            // Existing orders count, including orders later cancelled.
+            const previousOrder = await Order.exists({
+                userId: req.userId,
+            });
+
+            if (previousOrder) {
+                await User.updateOne(
+                    {
+                        _id: req.userId,
+                        referredBy: { $ne: null },
+                    },
+                    {
+                        $set: {
+                            referralFirstOrderDiscountUsed: true,
+                        },
+                    }
+                );
+            } else if (!referralUser.referralFirstOrderDiscountUsed) {
+                // Atomically claim the offer so concurrent checkout
+                // requests cannot both use it.
+                const claimedUser = await User.findOneAndUpdate(
+                    {
+                        _id: req.userId,
+                        referredBy: { $ne: null },
+                        referralFirstOrderDiscountUsed: { $ne: true },
+                    },
+                    {
+                        $set: {
+                            referralFirstOrderDiscountUsed: true,
+                        },
+                    },
+                    { new: true }
+                );
+
+                if (claimedUser) {
+                    referralDiscountClaimed = true;
+
+                    // Apply 10% to the server-calculated subtotal.
+                    // Combined discounts cannot exceed the subtotal.
+                    referralDiscount = Math.round(
+                        Math.min(
+                            subtotal * 0.1,
+                            Math.max(0, subtotal - discount)
+                        ) * 100
+                    ) / 100;
+                }
+            }
+        }
+
         // Calculate the final payable amount.
         totalAmount = Math.max(
             0,
             Math.round(
-                (subtotal - discount + shippingFee) * 100
+                (
+                    subtotal -
+                    discount -
+                    referralDiscount +
+                    shippingFee
+                ) * 100
             ) / 100
         );
 
@@ -351,6 +436,8 @@ const createOrder = async (req, res) => {
                     userId: req.userId,
                 }).select("balance");
 
+                await releaseReferralDiscountClaim();
+
                 return res.status(400).json({
                     success: false,
                     message: existingWallet
@@ -366,7 +453,6 @@ const createOrder = async (req, res) => {
                 (balanceBefore - totalAmount).toFixed(2)
             );
 
-            // Deduct funds only if the current balance is still sufficient.
             const updatedWallet = await Wallet.findOneAndUpdate(
                 {
                     _id: wallet._id,
@@ -410,6 +496,8 @@ const createOrder = async (req, res) => {
                     userId: req.userId,
                 }).select("balance");
 
+                await releaseReferralDiscountClaim();
+
                 return res.status(400).json({
                     success: false,
                     message: latestWallet
@@ -424,10 +512,8 @@ const createOrder = async (req, res) => {
             walletBalanceAfterDebit = Number(updatedWallet.balance);
         }
 
-
         // ================= RESERVE PRODUCT STOCK =================
 
-        // Deduct stock atomically to prevent overselling.
         for (const item of orderItems) {
             const quantity = Number(item.quantity);
 
@@ -440,13 +526,8 @@ const createOrder = async (req, res) => {
                 {
                     $inc: { stock: -quantity },
                 },
-                {
-                    new: true,
-                }
+                { new: true }
             );
-
-
-
 
             if (!updatedVariant) {
                 const stockError = new Error(
@@ -456,13 +537,11 @@ const createOrder = async (req, res) => {
                 throw stockError;
             }
 
-            // Record each deduction for rollback if checkout fails.
             reservedStock.push({
                 variantId: item.variantId,
                 quantity,
             });
         }
-
 
         // ================= CREATE ORDER =================
 
@@ -471,6 +550,7 @@ const createOrder = async (req, res) => {
                 1000 + Math.random() * 9000
             )}`,
             userId: req.userId,
+            isBuyNow: Boolean(buyNowVariantId),
             items: orderItems,
             shippingAddress: {
                 fullName: address.fullName,
@@ -483,6 +563,7 @@ const createOrder = async (req, res) => {
             },
             subtotal,
             discount,
+            referralDiscount,
             shippingFee,
             totalAmount,
             couponCode: validatedCouponCode,
@@ -493,7 +574,7 @@ const createOrder = async (req, res) => {
             // UPI payment window: 15 minutes from order creation.
             razorpayPaymentExpiresAt:
                 paymentMethod === "UPI"
-                    ? new Date(Date.now() + 15 * 60 * 1000)
+                    ? new Date(Date.now() + 0.5 * 60 * 1000)
                     : null,
 
             orderStatus: "Placed",
@@ -547,7 +628,6 @@ const createOrder = async (req, res) => {
             }
         }
 
-        // Return success for both checkout methods.
         return res.status(201).json({
             success: true,
             message:
@@ -566,7 +646,6 @@ const createOrder = async (req, res) => {
     } catch (error) {
         console.error("Create order error:", error);
 
-
         // Restore stock if checkout failed before the order was created.
         if (!orderCreated && reservedStock.length > 0) {
             for (const reserved of reservedStock) {
@@ -583,7 +662,6 @@ const createOrder = async (req, res) => {
                 }
             }
         }
-
 
         // Restore wallet funds if order creation failed after debit.
         if (walletDebited && !orderCreated) {
@@ -668,6 +746,9 @@ const createOrder = async (req, res) => {
             }
         }
 
+        // Release the referral claim if order creation failed.
+        await releaseReferralDiscountClaim();
+
         return res.status(error.statusCode || 500).json({
             success: false,
             message: error.statusCode
@@ -676,6 +757,201 @@ const createOrder = async (req, res) => {
         });
     }
 };
+
+
+
+const getCheckoutDiscountPreview = async (req, res) => {
+    try {
+        const { buyNowVariantId, couponCode } = req.body;
+
+        let checkoutItems = [];
+
+        if (buyNowVariantId) {
+            if (!mongoose.isValidObjectId(buyNowVariantId)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid product variant",
+                });
+            }
+
+            const variant = await Variant.findOne({
+                _id: buyNowVariantId,
+                isActive: true,
+                stock: { $gt: 0 },
+            });
+
+            if (!variant) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Product variant unavailable",
+                });
+            }
+
+            const product = await Product.findOne({
+                _id: variant.productId,
+                isActive: true,
+            });
+
+            if (!product) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Product unavailable",
+                });
+            }
+
+            checkoutItems = [{
+                variantId: variant._id,
+                product,
+                quantity: 1,
+            }];
+        } else {
+            const cart = await getCart(req.userId);
+            checkoutItems = cart?.items || [];
+        }
+
+        let subtotal = 0;
+
+        for (const item of checkoutItems) {
+            const variant = await Variant.findOne({
+                _id: item.variantId,
+                isActive: true,
+            });
+
+            if (!variant || !item.product) {
+                return res.status(400).json({
+                    success: false,
+                    message: "A checkout item is unavailable",
+                });
+            }
+
+            const product = await Product.findOne({
+                _id: variant.productId,
+                isActive: true,
+            });
+
+            if (!product) {
+                return res.status(400).json({
+                    success: false,
+                    message: "A checkout product is unavailable",
+                });
+            }
+
+            const pricing = await getVariantPricing(variant, product);
+            const quantity = Number(item.quantity || 1);
+
+            if (!Number.isInteger(quantity) || quantity < 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid product quantity",
+                });
+            }
+
+            subtotal += Number(pricing.price) * quantity;
+        }
+
+        subtotal = Math.round(subtotal * 100) / 100;
+
+        // Calculate the coupon discount for the preview.
+        let couponDiscount = 0;
+
+        if (couponCode && String(couponCode).trim()) {
+            const now = new Date();
+
+            const coupon = await Coupon.findOne({
+                code: String(couponCode).trim().toUpperCase(),
+                isActive: true,
+                startDate: { $lte: now },
+                endDate: { $gte: now },
+                $or: [
+                    { usageLimit: null },
+                    {
+                        $expr: {
+                            $lt: ["$usedCount", "$usageLimit"],
+                        },
+                    },
+                ],
+            }).lean();
+
+            if (
+                coupon &&
+                subtotal >= Number(coupon.minOrderAmount || 0)
+            ) {
+                if (coupon.discountType === "Percentage") {
+                    couponDiscount =
+                        subtotal * Number(coupon.discountValue) / 100;
+
+                    if (coupon.maxDiscount != null) {
+                        couponDiscount = Math.min(
+                            couponDiscount,
+                            Number(coupon.maxDiscount)
+                        );
+                    }
+                } else if (coupon.discountType === "Fixed") {
+                    couponDiscount = Number(coupon.discountValue);
+                }
+
+                couponDiscount = Math.round(
+                    Math.min(subtotal, Math.max(0, couponDiscount)) * 100
+                ) / 100;
+            }
+        }
+
+        // Check referral eligibility without consuming the offer.
+        const user = await User.findOne({
+            _id: req.userId,
+            referredBy: { $ne: null },
+            referralFirstOrderDiscountUsed: { $ne: true },
+        }).select("_id");
+
+        let referralEligible = false;
+
+        if (user) {
+            const previousOrder = await Order.exists({
+                userId: req.userId,
+            });
+
+            referralEligible = !previousOrder;
+        }
+
+        const referralDiscount = referralEligible
+            ? Math.round(
+                Math.min(
+                    subtotal * 0.10,
+                    Math.max(0, subtotal - couponDiscount)
+                ) * 100
+            ) / 100
+            : 0;
+
+        const totalAmount = Math.max(
+            0,
+            Math.round(
+                (
+                    subtotal -
+                    couponDiscount -
+                    referralDiscount
+                ) * 100
+            ) / 100
+        );
+
+        return res.status(200).json({
+            success: true,
+            subtotal,
+            couponDiscount,
+            referralEligible,
+            referralDiscount,
+            totalAmount,
+        });
+    } catch (error) {
+        console.error("Checkout discount preview error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to calculate checkout discounts",
+        });
+    }
+};
+
+
 
 // ================= GET CUSTOMER ORDERS =================
 
@@ -700,8 +976,6 @@ const getMyOrders = async (req, res) => {
 };
 
 // ================= RETURN / EXCHANGE REQUEST =================
-
-
 
 const requestReturnExchange = async (req, res) => {
     try {
@@ -769,18 +1043,27 @@ const requestReturnExchange = async (req, res) => {
             });
         }
 
-        if (
-            order.orderStatus !== "Delivered" ||
-            !order.deliveredAt
-        ) {
+        const item = order.items[index];
+
+        const itemStatus = String(
+            item.status || item.itemStatus || ""
+        )
+            .trim()
+            .toLowerCase();
+
+        const deliveryDate = item.deliveredAt || order.deliveredAt;
+
+        if (itemStatus !== "delivered" || !deliveryDate) {
             return res.status(400).json({
                 success: false,
-                message: "Returns and exchanges are available after delivery",
+                message:
+                    "Returns and exchanges are available only after the selected item is delivered",
             });
         }
 
+        // Return window: 7 days. Exchange window: 10 days.
         const deadlineDays = type === "Return" ? 7 : 10;
-        const deadline = new Date(order.deliveredAt);
+        const deadline = new Date(deliveryDate);
         deadline.setDate(deadline.getDate() + deadlineDays);
 
         if (new Date() > deadline) {
@@ -793,9 +1076,6 @@ const requestReturnExchange = async (req, res) => {
             });
         }
 
-        const item = order.items[index];
-
-        // Prevent mixing legacy requests with the new quantity workflow.
         if (
             item.returnExchange &&
             item.returnExchange.status !== "Not Requested"
@@ -828,8 +1108,8 @@ const requestReturnExchange = async (req, res) => {
         const availableQuantity = Math.max(
             0,
             Number(item.quantity) -
-            completedQuantity -
-            pendingQuantity
+                completedQuantity -
+                pendingQuantity
         );
 
         if (requestedQuantity > availableQuantity) {
@@ -850,8 +1130,6 @@ const requestReturnExchange = async (req, res) => {
                 });
             }
 
-            // The original variant is allowed too. This supports
-            // replacing a damaged shoe with the same color and size.
             replacement = await Variant.findOne({
                 _id: replacementVariantId,
                 productId: item.productId,
@@ -879,8 +1157,6 @@ const requestReturnExchange = async (req, res) => {
                 });
             }
 
-            // Only a different variant needs price comparison.
-            // Same-variant replacement does not require a new selection.
             if (
                 String(replacement._id) !== String(item.variantId)
             ) {
@@ -925,7 +1201,7 @@ const requestReturnExchange = async (req, res) => {
 
         const savedRequest =
             item.itemActionRequests[
-            item.itemActionRequests.length - 1
+                item.itemActionRequests.length - 1
             ];
 
         return res.status(201).json({
@@ -944,8 +1220,8 @@ const requestReturnExchange = async (req, res) => {
     }
 };
 
-
 // ================= CANCEL ORDER =================
+
 const cancelOrder = async (req, res) => {
     const session = await mongoose.startSession();
 
@@ -971,7 +1247,6 @@ const cancelOrder = async (req, res) => {
         let responseData;
 
         await session.withTransaction(async () => {
-            // Always read the latest order inside the transaction.
             const order = await Order.findOne({
                 _id: orderId,
                 userId: req.userId,
@@ -999,10 +1274,6 @@ const cancelOrder = async (req, res) => {
 
             const item = order.items[index];
 
-
-
-            // Do not allow cancellation when an older return/exchange
-            // request for this product is still active.
             const oldRequestStatus = item.returnExchange?.status;
 
             if (
@@ -1021,7 +1292,6 @@ const cancelOrder = async (req, res) => {
             const alreadyReturned = Number(item.returnedQuantity || 0);
             const alreadyExchanged = Number(item.exchangedQuantity || 0);
 
-            // Count quantities reserved by requests that are still active.
             const pendingActionQuantity = (
                 item.itemActionRequests || []
             )
@@ -1034,14 +1304,13 @@ const cancelOrder = async (req, res) => {
                     0
                 );
 
-            // Cancel every remaining available unit on this product line.
             const cancelQuantity = Math.max(
                 0,
                 Number(item.quantity || 0) -
-                alreadyCancelled -
-                alreadyReturned -
-                alreadyExchanged -
-                pendingActionQuantity
+                    alreadyCancelled -
+                    alreadyReturned -
+                    alreadyExchanged -
+                    pendingActionQuantity
             );
 
             if (cancelQuantity <= 0) {
@@ -1064,10 +1333,12 @@ const cancelOrder = async (req, res) => {
             const unitPrice = Number(item.price || 0);
             const grossAmount = unitPrice * cancelQuantity;
 
-            // Allocate the order-level discount proportionally.
-            // This assumes order.discount contains the order-level
-            // discount, while item.price already reflects product offers.
-            const orderDiscount = Number(order.discount || 0);
+            // Include coupon and referral discounts in the proportional
+            // order-level discount allocation.
+            const orderDiscount =
+                Number(order.discount || 0) +
+                Number(order.referralDiscount || 0);
+
             const orderSubtotal = Number(order.subtotal || 0);
 
             const discountShare =
@@ -1085,8 +1356,6 @@ const cancelOrder = async (req, res) => {
             const transactionId =
                 `CANCEL-${order._id}-${index}-${alreadyCancelled + cancelQuantity}`;
 
-            // Restore stock and update cancellation quantity within
-            // the same transaction.
             variant.stock =
                 Number(variant.stock || 0) + cancelQuantity;
 
@@ -1109,7 +1378,6 @@ const cancelOrder = async (req, res) => {
                     });
                 }
 
-                // Extra protection against crediting the same refund twice.
                 const refundAlreadyExists = (
                     wallet.transactions || []
                 ).some(
@@ -1157,8 +1425,6 @@ const cancelOrder = async (req, res) => {
                 order.refundedAt = new Date();
             }
 
-            // Cancel the entire order only when all originally ordered
-            // units have been cancelled.
             const totalCancelled = order.items.reduce(
                 (total, currentItem) =>
                     total +
@@ -1199,20 +1465,19 @@ const cancelOrder = async (req, res) => {
 
         return res.status(error.statusCode || 500).json({
             success: false,
-            message:
-                error.statusCode
-                    ? error.message
-                    : "Failed to cancel product",
+            message: error.statusCode
+                ? error.message
+                : "Failed to cancel product",
         });
     } finally {
         await session.endSession();
     }
 };
 
-
 module.exports = {
     createOrder,
     getMyOrders,
+    getCheckoutDiscountPreview,
     requestReturnExchange,
     cancelOrder,
 };

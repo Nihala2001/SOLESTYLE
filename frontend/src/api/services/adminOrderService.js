@@ -13,11 +13,25 @@ export const getOrderById = async (orderId) => {
     return response.data;
 };
 
-// Update order status
+// Update overall order status (retain for existing workflows)
 export const updateOrderStatus = async (orderId, orderStatus) => {
     const response = await api.patch(
         `/admin/orders/${orderId}/status`,
         { orderStatus }
+    );
+
+    return response.data;
+};
+
+// Update one product's delivery status
+export const updateOrderItemStatus = async (
+    orderId,
+    itemId,
+    status
+) => {
+    const response = await api.patch(
+        `/admin/orders/${orderId}/items/${itemId}/status`,
+        { status }
     );
 
     return response.data;

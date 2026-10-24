@@ -131,10 +131,36 @@ const orderItemSchema = new mongoose.Schema(
             min: 0,
         },
 
+        referralDiscount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
         quantity: {
             type: Number,
             required: true,
             min: 1,
+        },
+
+        // Individual delivery status for this product in the order.
+        status: {
+            type: String,
+            enum: [
+                "Placed",
+                "Confirmed",
+                "Shipped",
+                "Out for Delivery",
+                "Delivered",
+                "Cancelled",
+            ],
+            default: "Placed",
+        },
+
+        // Delivery date for this specific product.
+        deliveredAt: {
+            type: Date,
+            default: null,
         },
 
         // Quantity tracking for partial cancellation and returns.
@@ -229,7 +255,6 @@ const orderItemSchema = new mongoose.Schema(
             },
         },
     },
-    { _id: false }
 );
 
 /* ================= ORDER ================= */
@@ -280,6 +305,12 @@ const orderSchema = new mongoose.Schema(
             min: 0,
         },
 
+        referralDiscount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+
         shippingFee: {
             type: Number,
             default: 0,
@@ -322,6 +353,16 @@ const orderSchema = new mongoose.Schema(
                 "Returned",
             ],
             default: "Placed",
+        },
+
+        isBuyNow: {
+            type: Boolean,
+            default: false,
+        },
+
+        cartCleanupCompleted: {
+            type: Boolean,
+            default: false,
         },
 
         deliveredAt: {

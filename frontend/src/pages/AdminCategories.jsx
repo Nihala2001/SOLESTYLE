@@ -331,17 +331,6 @@ function AdminCategories() {
       {/* ================= HEADER ================= */}
 
       <div className="categories-header">
-
-        <div>
-          <h1>
-            Category Management
-          </h1>
-
-          <p>
-            Manage your store categories.
-          </p>
-        </div>
-
         <button
           className="add-category-button"
           onClick={() => {

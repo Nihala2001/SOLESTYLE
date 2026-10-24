@@ -3,6 +3,8 @@ const crypto = require("crypto");
 const Razorpay = require("razorpay");
 const mongoose = require("mongoose");
 const Order = require("../../models/Order");
+const Cart = require("../../models/Cart");
+const Variant = require("../../models/Variant");
 
 /* Get the logged-in user's ID */
 const getUserId = (req) =>
@@ -24,6 +26,64 @@ const getRazorpayClient = () => {
         key_id: keyId,
         key_secret: keySecret,
     });
+};
+
+const cleanupVerifiedOrderCart = async (order) => {
+    if (
+        !order ||
+        order.paymentStatus !== "Paid" ||
+        order.isBuyNow ||
+        order.cartCleanupCompleted
+    ) {
+        return;
+    }
+
+    // Claim cleanup so repeated verification cannot remove quantities twice.
+    const claimed = await Order.findOneAndUpdate(
+        {
+            _id: order._id,
+            paymentStatus: "Paid",
+            isBuyNow: false,
+            cartCleanupCompleted: { $ne: true },
+        },
+        { $set: { cartCleanupCompleted: true } },
+        { new: true }
+    );
+
+    if (!claimed) return;
+
+    try {
+        const cart = await Cart.findOne({ userId: order.userId });
+        if (!cart) return;
+
+        const remainingToRemove = new Map();
+
+        for (const item of order.items) {
+            const id = String(item.variantId);
+            remainingToRemove.set(
+                id,
+                (remainingToRemove.get(id) || 0) + Number(item.quantity)
+            );
+        }
+
+        for (const cartItem of cart.items) {
+            const id = String(cartItem.variantId);
+            const remove = remainingToRemove.get(id) || 0;
+            const quantityRemoved = Math.min(cartItem.quantity, remove);
+
+            cartItem.quantity -= quantityRemoved;
+            remainingToRemove.set(id, remove - quantityRemoved);
+        }
+
+        cart.items = cart.items.filter((item) => item.quantity > 0);
+        await cart.save();
+    } catch (error) {
+        await Order.updateOne(
+            { _id: order._id },
+            { $set: { cartCleanupCompleted: false } }
+        );
+        throw error;
+    }
 };
 
 /* ================= CREATE RAZORPAY ORDER ================= */
@@ -128,7 +188,7 @@ const createRazorpayOrder = async (req, res) => {
 
         order.razorpayOrderId = razorpayOrder.id;
         order.razorpayPaymentExpiresAt = new Date(
-            Date.now() + 15 * 60 * 1000
+            Date.now() + 0.5 * 60 * 1000
         );
 
         await order.save();
@@ -341,6 +401,8 @@ const verifyRazorpayPayment = async (req, res) => {
             });
         }
 
+        await cleanupVerifiedOrderCart(updatedOrder);
+
         return res.status(200).json({
             success: true,
             message: "Payment verified successfully.",
@@ -356,7 +418,111 @@ const verifyRazorpayPayment = async (req, res) => {
     }
 };
 
+const expireUpiOrder = async (req, res) => {
+    const session = await mongoose.startSession();
+
+    try {
+        const userId = getUserId(req);
+        const { orderId } = req.params;
+
+        const order = await Order.findOne({
+            _id: orderId,
+            userId,
+            paymentMethod: "UPI",
+        });
+
+        if (!order) {
+            return res.status(404).json({ message: "Order not found." });
+        }
+
+        if (order.paymentStatus === "Paid") {
+            return res.status(400).json({
+                message: "Payment succeeded. Stock will not be restored.",
+            });
+        }
+
+        if (order.razorpayReservationsReleased) {
+            return res.json({ message: "Stock was already restored." });
+        }
+
+        if (
+            !order.razorpayPaymentExpiresAt ||
+            new Date(order.razorpayPaymentExpiresAt) > new Date()
+        ) {
+            return res.status(400).json({
+                message: "Payment session has not expired yet.",
+            });
+        }
+
+        // Check Razorpay before restoring stock.
+        if (order.razorpayOrderId) {
+            const razorpay = getRazorpayClient();
+            const result = await razorpay.orders.fetchPayments(
+                order.razorpayOrderId
+            );
+
+            const payments = result.items || [];
+            const unsettledPayment = payments.some((payment) =>
+                ["authorized", "captured"].includes(payment.status)
+            );
+
+            if (unsettledPayment) {
+                return res.status(409).json({
+                    message:
+                        "A payment may have succeeded. Verify its status before releasing stock.",
+                });
+            }
+        }
+
+        await session.withTransaction(async () => {
+            const currentOrder = await Order.findOne({
+                _id: orderId,
+                userId,
+                paymentMethod: "UPI",
+                paymentStatus: "Pending",
+                razorpayReservationsReleased: { $ne: true },
+                razorpayPaymentExpiresAt: { $lte: new Date() },
+            }).session(session);
+
+            if (!currentOrder) return;
+
+            for (const item of currentOrder.items) {
+                const quantityToRestore = Math.max(
+                    0,
+                    Number(item.quantity) - Number(item.cancelledQuantity || 0)
+                );
+
+                if (quantityToRestore > 0) {
+                    await Variant.updateOne(
+                        { _id: item.variantId },
+                        { $inc: { stock: quantityToRestore } },
+                        { session }
+                    );
+                }
+            }
+
+            currentOrder.paymentStatus = "Failed";
+            currentOrder.orderStatus = "Cancelled";
+            currentOrder.razorpayReservationsReleased = true;
+
+            await currentOrder.save({ session });
+        });
+
+        return res.json({
+            message: "Expired order processed. Any remaining reserved stock was restored.",
+        });
+    } catch (error) {
+        console.error("UPI expiry error:", error);
+        return res.status(500).json({
+            message: "Unable to process expired payment.",
+        });
+    } finally {
+        await session.endSession();
+    }
+};
+
 module.exports = {
     createRazorpayOrder,
     verifyRazorpayPayment,
+    expireUpiOrder,
 };

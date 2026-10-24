@@ -152,13 +152,6 @@ function AdminProfile() {
         onClose={closeNotification}
       />
       <div className="admin-profile-page">
-        <div className="profile-header">
-          <div>
-            <h1>Admin Profile</h1>
-            <p>Manage your administrator account.</p>
-          </div>
-        </div>
-
         <div className="admin-profile-card">
           {/* PROFILE IMAGE */}
 

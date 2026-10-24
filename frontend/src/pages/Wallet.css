@@ -510,3 +510,96 @@
     font-size: 9px;
   }
 }
+/* ================= REFERRAL REWARDS SUMMARY ================= */
+
+.wallet-referral-summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 26px;
+  margin: 28px 0;
+  background: #fff;
+  border: 1px solid #eadbd4;
+  border-radius: 16px;
+  box-shadow: 0 3px 12px rgba(100, 70, 55, 0.05);
+}
+
+.wallet-referral-icon {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: #f8e8e9;
+  color: #a64d68;
+}
+
+.wallet-referral-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.wallet-referral-details h2 {
+  margin: 0 0 6px;
+  color: #342b2b;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.wallet-referral-details p {
+  margin: 0 0 7px;
+  color: #766b68;
+  font-size: 13px;
+}
+
+.wallet-referral-details span {
+  color: #a64d68;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wallet-referral-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-align: right;
+}
+
+.wallet-referral-total span {
+  color: #766b68;
+  font-size: 12px;
+}
+
+.wallet-referral-total strong {
+  color: #27845a;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .wallet-referral-summary {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 18px;
+  }
+
+  .wallet-referral-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .wallet-referral-details h2 {
+    font-size: 16px;
+  }
+
+  .wallet-referral-details p {
+    line-height: 1.5;
+  }
+
+  .wallet-referral-total strong {
+    font-size: 19px;
+  }
+}

@@ -431,11 +431,6 @@ function AdminCoupons() {
   return (
     <AdminLayout title="Coupons">
       <div className="coupons-header">
-        <div>
-          <h1>Coupon Management</h1>
-          <p>Create and manage discount coupons for SOLESTYLE.</p>
-        </div>
-
         <button
           className="coupons-primary-button"
           onClick={openAddModal}

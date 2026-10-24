@@ -39,6 +39,13 @@ const getItemsCount = (order) =>
   );
 
 function AdminSalesReport() {
+  const now = new Date();
+
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(now.getDate()).padStart(2, "0")}`;
+
   const [period, setPeriod] = useState("month");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -79,10 +86,18 @@ function AdminSalesReport() {
 
   const applyFilter = (selectedPeriod = period) => {
     setPeriod(selectedPeriod);
+    setError("");
 
     if (selectedPeriod === "custom") {
       if (!startDate || !endDate) {
         setError("Please select both start and end dates.");
+        return;
+      }
+
+      if (startDate > today || endDate > today) {
+        setError(
+          "Future dates are not allowed. Please select today or a past date.",
+        );
         return;
       }
 
@@ -184,14 +199,6 @@ function AdminSalesReport() {
       <div className="sales-report-page">
         {/* Page heading */}
         <div className="sales-report-heading">
-          <div>
-            <h1>Sales Report</h1>
-            <p>
-              Review sales performance and order details for your selected
-              period.
-            </p>
-          </div>
-
           <button
             className="sales-export-btn"
             onClick={downloadCSV}
@@ -234,6 +241,7 @@ function AdminSalesReport() {
                 <input
                   type="date"
                   value={startDate}
+                  max={today}
                   onChange={(event) => setStartDate(event.target.value)}
                 />
               </label>
@@ -243,6 +251,8 @@ function AdminSalesReport() {
                 <input
                   type="date"
                   value={endDate}
+                  min={startDate || undefined}
+                  max={today}
                   onChange={(event) => setEndDate(event.target.value)}
                 />
               </label>
@@ -384,49 +394,48 @@ function AdminSalesReport() {
                 </div>
               )}
 
-{totalPages > 1 && (
-    <div className="sales-pagination">
-        <span className="sales-pagination-info">
-            Showing {startIndex + 1}–
-            {Math.min(startIndex + ordersPerPage, orders.length)} of{" "}
-            {orders.length} orders
-        </span>
+              {totalPages > 1 && (
+                <div className="sales-pagination">
+                  <span className="sales-pagination-info">
+                    Showing {startIndex + 1}–
+                    {Math.min(startIndex + ordersPerPage, orders.length)} of{" "}
+                    {orders.length} orders
+                  </span>
 
-        <div className="sales-pagination-controls">
-            <button
-                className="sales-page-btn"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-            >
-                Previous
-            </button>
+                  <div className="sales-pagination-controls">
+                    <button
+                      className="sales-page-btn"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </button>
 
-            {Array.from(
-                { length: totalPages },
-                (_, index) => index + 1
-            ).map((page) => (
-                <button
-                    key={page}
-                    className={`sales-page-btn ${
-                        currentPage === page ? "active" : ""
-                    }`}
-                    onClick={() => handlePageChange(page)}
-                >
-                    {page}
-                </button>
-            ))}
+                    {Array.from(
+                      { length: totalPages },
+                      (_, index) => index + 1,
+                    ).map((page) => (
+                      <button
+                        key={page}
+                        className={`sales-page-btn ${
+                          currentPage === page ? "active" : ""
+                        }`}
+                        onClick={() => handlePageChange(page)}
+                      >
+                        {page}
+                      </button>
+                    ))}
 
-            <button
-                className="sales-page-btn"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-            >
-                Next
-            </button>
-        </div>
-    </div>
-)}
-
+                    <button
+                      className="sales-page-btn"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           </>
         )}

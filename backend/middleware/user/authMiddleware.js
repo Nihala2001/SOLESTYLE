@@ -1,11 +1,14 @@
-const jwt = require("jsonwebtoken");
 
-const authMiddleware = (req, res, next) => {
+const jwt = require("jsonwebtoken");
+const User = require("../../models/User");
+
+const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
+        code: "UNAUTHORIZED",
         message: "Authorization token is required",
       });
     }
@@ -14,21 +17,57 @@ const authMiddleware = (req, res, next) => {
 
     if (!token) {
       return res.status(401).json({
+        code: "UNAUTHORIZED",
         message: "Invalid authorization format",
       });
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET
-    );
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.userId = decoded.userId;
+    if (!decoded.userId) {
+      return res.status(401).json({
+        code: "UNAUTHORIZED",
+        message: "Invalid authorization token",
+      });
+    }
+
+    // Fetch the current account status from MongoDB.
+    const user = await User.findById(decoded.userId).select("_id isActive");
+
+    if (!user) {
+      return res.status(401).json({
+        code: "UNAUTHORIZED",
+        message: "User account not found",
+      });
+    }
+
+    // Reject requests from accounts blocked by the admin.
+    if (!user.isActive) {
+      return res.status(403).json({
+        code: "ACCOUNT_BLOCKED",
+        message: "Your account has been blocked by the administrator",
+      });
+    }
+
+    req.userId = user._id.toString();
 
     next();
   } catch (error) {
-    return res.status(401).json({
-      message: "Invalid or expired token",
+    if (
+      error.name === "JsonWebTokenError" ||
+      error.name === "TokenExpiredError"
+    ) {
+      return res.status(401).json({
+        code: "UNAUTHORIZED",
+        message: "Invalid or expired token",
+      });
+    }
+
+    console.error("User authentication error:", error);
+
+    return res.status(500).json({
+      code: "AUTHENTICATION_ERROR",
+      message: "Unable to authenticate your request",
     });
   }
 };

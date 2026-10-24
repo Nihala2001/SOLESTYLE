@@ -8,14 +8,33 @@ import {
   RefreshCw,
   Clock,
   ShieldCheck,
+  Gift,
 } from "lucide-react";
 
 import {
   getWallet,
   getWalletTransactions,
+   createWalletTopUp,
+  verifyWalletTopUp,
 } from "../api/services/userWalletService";
 
+
 import "./Wallet.css";
+
+const loadRazorpayScript = () =>
+  new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
 
 function Wallet() {
   const [balance, setBalance] = useState(0);
@@ -62,32 +81,101 @@ function Wallet() {
     loadWallet();
   }, []);
 
-  const handleAddMoney = (e) => {
-    e.preventDefault();
-    setMessage("");
+  
+const handleAddMoney = async (e) => {
+  e.preventDefault();
+  setMessage("");
 
-    const money = Number(amount);
+  const money = Number(amount);
 
-    if (!amount || !Number.isFinite(money) || money <= 0) {
-      setMessage("Please enter a valid amount.");
+  if (!amount || !Number.isFinite(money) || money < 1 || money > 50000) {
+    setMessage("Enter an amount between ₹1 and ₹50,000.");
+    return;
+  }
+
+  if (Math.abs(money * 100 - Math.round(money * 100)) > 0.000001) {
+    setMessage("Enter an amount with at most two decimal places.");
+    return;
+  }
+
+  setAddingMoney(true);
+
+  try {
+    const scriptLoaded = await loadRazorpayScript();
+
+    if (!scriptLoaded) {
+      throw new Error("Unable to load Razorpay. Check your connection.");
+    }
+
+    const created = await createWalletTopUp(money);
+
+    if (!created.success || !created.razorpayOrder || !created.keyId) {
+      throw new Error(created.message || "Unable to start wallet top-up.");
+    }
+
+    const result = await new Promise((resolve, reject) => {
+      const checkout = new window.Razorpay({
+        key: created.keyId,
+        amount: created.razorpayOrder.amount,
+        currency: created.razorpayOrder.currency,
+        name: "SOLESTYLE",
+        description: "Wallet top-up",
+        order_id: created.razorpayOrder.id,
+        handler: async (paymentResponse) => {
+          try {
+            const verification = await verifyWalletTopUp({
+              ...paymentResponse,
+              amount: money,
+            });
+
+            if (!verification.success) {
+              throw new Error(
+                verification.message || "Wallet payment verification failed."
+              );
+            }
+
+            resolve(verification);
+          } catch (error) {
+            reject(error);
+          }
+        },
+        modal: {
+          ondismiss: () => resolve(null),
+        },
+        theme: { color: "#c2185b" },
+      });
+
+      checkout.on("payment.failed", (event) => {
+        reject(
+          new Error(
+            event.error?.description || "Wallet payment failed."
+          )
+        );
+      });
+
+      checkout.open();
+    });
+
+    if (!result) {
+      setMessage("Payment window closed. Your wallet has not been credited.");
       return;
     }
 
-    if (money < 1) {
-      setMessage("The minimum amount is ₹1.");
-      return;
-    }
-
-    setAddingMoney(true);
-
-    // A verified payment gateway must be integrated before
-    // money can safely be credited to the wallet.
+    setBalance(Number(result.wallet?.balance || 0));
+    setAmount("");
+    setMessage("Wallet topped up successfully.");
+    await loadWallet();
+  } catch (err) {
     setMessage(
-      "Online wallet top-up is not connected yet. Your balance has not been changed."
+      err.response?.data?.message ||
+        err.message ||
+        "Unable to add money. Please try again."
     );
-
+  } finally {
     setAddingMoney(false);
-  };
+  }
+};
+
 
   const formatMoney = (value) =>
     `₹${Number(value || 0).toLocaleString("en-IN", {
@@ -112,6 +200,32 @@ function Wallet() {
       minute: "2-digit",
     });
   };
+
+  const totalReferralRewards = transactions.reduce((total, transaction) => {
+  const isReferralReward =
+    transaction.referenceType === "Referral" ||
+    String(transaction.transactionId || "").startsWith("REFERRAL-");
+
+  if (
+    isReferralReward &&
+    String(transaction.type).toLowerCase() === "credit"
+  ) {
+    return total + Number(transaction.amount || 0);
+  }
+
+  return total;
+}, 0);
+
+const referralRewardCount = transactions.filter((transaction) => {
+  const isReferralReward =
+    transaction.referenceType === "Referral" ||
+    String(transaction.transactionId || "").startsWith("REFERRAL-");
+
+  return (
+    isReferralReward &&
+    String(transaction.type).toLowerCase() === "credit"
+  );
+}).length;
 
   return (
     <div className="wallet-page">
@@ -228,12 +342,34 @@ function Wallet() {
               Add Money
             </button>
 
-            <p className="wallet-payment-note">
-              Payment gateway integration is required to add money securely.
-            </p>
+           <p className="wallet-payment-note">
+  Secure wallet top-ups are processed through Razorpay.
+</p>
           </form>
         </section>
       </div>
+
+      <section className="wallet-referral-summary">
+  <div className="wallet-referral-icon">
+    <Gift size={24} />
+  </div>
+
+  <div className="wallet-referral-details">
+    <h2>Referral Rewards</h2>
+    <p>
+      Total rewards earned from referring friends.
+    </p>
+    <span>
+      {referralRewardCount}{" "}
+      {referralRewardCount === 1 ? "reward received" : "rewards received"}
+    </span>
+  </div>
+
+  <div className="wallet-referral-total">
+    <span>Total Earned</span>
+    <strong>{formatMoney(totalReferralRewards)}</strong>
+  </div>
+</section>
 
       <section className="wallet-transactions-section">
         <div className="wallet-transactions-header">

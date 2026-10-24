@@ -266,65 +266,52 @@ useEffect(() => {
 
   return (
     <AdminLayout title="Products">
-      {/* ================= HEADER ================= */}
+     
+     
+{/* HEADER + SEARCH ROW */}
+<div className="products-toolbar">
+  <div className="product-search">
+    <input
+      type="text"
+      placeholder="Search product..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") handleSearch();
+      }}
+    />
 
-      <div className="products-header">
-        <div>
-          <h1>Product Management</h1>
+    <select
+      value={selectedCategory}
+      onChange={(e) => {
+        setSelectedCategory(e.target.value);
+        setPage(1);
+      }}
+    >
+      <option value="">All Categories</option>
+      {categories
+        .filter((category) => category.isActive)
+        .map((category) => (
+          <option key={category._id} value={category._id}>
+            {category.name}
+          </option>
+        ))}
+    </select>
 
-          <p>Manage your store products.</p>
-        </div>
+    <button onClick={handleSearch}>Search</button>
+    <button className="clear-button" onClick={handleClear}>
+      Clear
+    </button>
+  </div>
 
-        <button
-          className="add-product-button"
-          onClick={() => navigate("/admin/products/add")}
-        >
-          + Add Product
-        </button>
-      </div>
+  <button
+    className="add-product-button"
+    onClick={() => navigate("/admin/products/add")}
+  >
+    + Add Product
+  </button>
+</div>
 
-      {/* ================= SEARCH ================= */}
-
-      <div className="product-search">
-        <input
-          type="text"
-          placeholder="Search product..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              handleSearch();
-            }
-          }}
-        />
-
-        <select
-          value={selectedCategory}
-          onChange={(e) => {
-            setSelectedCategory(e.target.value);
-
-            setPage(1);
-          }}
-        >
-          <option value="">All Categories</option>
-
-          {categories
-            .filter((category) => category.isActive)
-            .map((category) => (
-              <option key={category._id} value={category._id}>
-                {category.name}
-              </option>
-            ))}
-        </select>
-
-        <button onClick={handleSearch}>Search</button>
-
-        <button className="clear-button" onClick={handleClear}>
-          Clear
-        </button>
-      </div>
 
       {/* ================= DELETE CONFIRMATION ================= */}
 
@@ -421,14 +408,6 @@ useEffect(() => {
                   <td>{new Date(product.createdAt).toLocaleDateString()}</td>
 
                   <td>
-                    <button
-                      className="edit-button"
-                      onClick={() =>
-                        navigate(`/admin/products/${product._id}/edit`)
-                      }
-                    >
-                      Edit
-                    </button>
 
                     {product.isActive ? (
                       <button

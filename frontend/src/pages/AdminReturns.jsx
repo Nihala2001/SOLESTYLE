@@ -177,13 +177,6 @@ function AdminReturns() {
     <AdminLayout title="Returns">
       <div className="admin-returns">
         <div className="admin-returns-header">
-          <div>
-            <h1>Returns & Exchanges</h1>
-            <p>
-              Review and manage customer return and exchange requests.
-            </p>
-          </div>
-
           <button
             type="button"
             className="returns-refresh-btn"

@@ -107,12 +107,7 @@ const topSellingCategories = dashboard?.topSellingCategories || [];
 
   return (
     <AdminLayout title="Dashboard">
-      <div className="dashboard-welcome">
-        <div>
-          <h1>Welcome back 👋</h1>
-          <p>Here's what's happening with your store today.</p>
-        </div>
-      </div>
+     
 
       {error && (
         <div className="dashboard-section" role="alert">

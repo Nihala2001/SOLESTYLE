@@ -30,6 +30,9 @@ const adminReviewRoutes = require("./routes/admin/adminReviewRoutes");
 const adminSalesReportRoutes = require("./routes/admin/adminSalesReportRoutes");
 const adminDashboardRoutes = require("./routes/admin/adminDashboardRoutes");
 
+
+const startUpiExpiryJob = require("./utils/upiExpiryJob");
+
 // Create the Express app BEFORE calling app.use()
 const app = express();
 
@@ -87,6 +90,8 @@ const PORT = process.env.PORT || 5001;
 
 const startServer = async () => {
     await connectDB();
+
+    startUpiExpiryJob();
 
     app.listen(PORT, "0.0.0.0", () => {
         console.log(`Server running on port ${PORT}`);

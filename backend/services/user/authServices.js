@@ -10,10 +10,34 @@ const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID
 );
 
-// ======================================================
-// REGISTER USER
-// ======================================================
 
+
+// GENERATE UNIQUE REFERRAL CODE
+const generateReferralCode = async (name) => {
+  const prefix = name
+    .replace(/[^A-Za-z]/g, "")
+    .substring(0, 4)
+    .toUpperCase() || "SOLE";
+
+  let referralCode;
+  let exists = true;
+
+  while (exists) {
+    const randomPart = Math.random()
+      .toString(36)
+      .substring(2, 7)
+      .toUpperCase();
+
+    referralCode = `${prefix}${randomPart}`;
+
+    exists = await User.exists({ referralCode });
+  }
+
+  return referralCode;
+};
+
+
+// REGISTER USER
 const registerUser = async ({
   name,
   email,
@@ -28,13 +52,32 @@ const registerUser = async ({
     throw new Error("Email already registered");
   }
 
+  let referrer = null;
+  let normalizedReferralCode = null;
+
+  // Validate the optional referral code
+  if (referralCode && referralCode.trim()) {
+    normalizedReferralCode = referralCode.trim().toUpperCase();
+
+    referrer = await User.findOne({
+      referralCode: normalizedReferralCode,
+      isVerified: true,
+      isActive: true,
+    });
+
+    if (!referrer) {
+      throw new Error("Invalid referral code");
+    }
+  }
+
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await User.create({
     name,
     email,
     password: hashedPassword,
-    referralCodeUsed: referralCode || null,
+    referralCodeUsed: normalizedReferralCode,
+    referredBy: referrer ? referrer._id : null,
     isVerified: false,
   });
 
@@ -42,9 +85,7 @@ const registerUser = async ({
     100000 + Math.random() * 900000
   ).toString();
 
-  const expireAt = new Date(
-    Date.now() + 5 * 60 * 1000
-  );
+  const expireAt = new Date(Date.now() + 5 * 60 * 1000);
 
   await Otp.create({
     userId: user._id,
@@ -61,15 +102,12 @@ const registerUser = async ({
   );
 
   return {
-  userId: user._id,
-  expiresAt: expireAt.toISOString(),
-};
+    userId: user._id,
+    expiresAt: expireAt.toISOString(),
+  };
 };
 
-// ======================================================
 // VERIFY REGISTRATION OTP
-// ======================================================
-
 const verifyOtp = async ({ email, otp }) => {
   const otpRecord = await Otp.findOne({
     email,
@@ -94,6 +132,10 @@ const verifyOtp = async ({ email, otp }) => {
   }
 
   user.isVerified = true;
+
+  if (!user.referralCode) {
+    user.referralCode = await generateReferralCode(user.name);
+  }
 
   await user.save();
 
@@ -156,9 +198,9 @@ const resendOtp = async ({ email }) => {
   );
 
   return {
-  message: "OTP resent successfully",
-  expiresAt: expireAt.toISOString(),
-};
+    message: "OTP resent successfully",
+    expiresAt: expireAt.toISOString(),
+  };
 };
 
 // ======================================================
@@ -189,6 +231,12 @@ const loginUser = async ({ email, password }) => {
 
   if (!isPasswordMatch) {
     throw new Error("Invalid email or password");
+  }
+
+  // Generate a referral code for existing verified users
+  if (!user.referralCode) {
+    user.referralCode = await generateReferralCode(user.name);
+    await user.save();
   }
 
   const token = generateToken(user._id);
@@ -241,9 +289,9 @@ const forgotPassword = async ({ email }) => {
   );
 
   return {
-  message: "OTP sent successfully",
-  expiresAt: expireAt.toISOString(),
-};
+    message: "OTP sent successfully",
+    expiresAt: expireAt.toISOString(),
+  };
 };
 
 // ======================================================
@@ -375,17 +423,25 @@ const googleLogin = async (idToken) => {
 
     user.isVerified = true;
 
+    // Ensure existing Google users have a referral code
+    if (!user.referralCode) {
+      user.referralCode = await generateReferralCode(user.name);
+    }
+
     await user.save();
   } else {
-    user = await User.create({
-      name,
-      email,
-      googleId,
-      profileImage: picture ? [picture] : [],
-      isVerified: true,
-      isActive: true,
-    });
-  }
+  const referralCode = await generateReferralCode(name);
+
+  user = await User.create({
+    name,
+    email: email.toLowerCase().trim(),
+    googleId,
+    profileImage: picture ? [picture] : [],
+    referralCode,
+    isVerified: true,
+    isActive: true,
+  });
+}
 
   const token = generateToken(user._id);
 
@@ -430,10 +486,10 @@ const sendChangeEmailOtp = async ({
   }
 
   if (user.googleId) {
-  throw new Error(
-    "Email address cannot be changed for Google-authenticated accounts"
-  );
-}
+    throw new Error(
+      "Email address cannot be changed for Google-authenticated accounts"
+    );
+  }
 
   if (user.email === newEmail) {
     throw new Error(
@@ -490,9 +546,9 @@ const sendChangeEmailOtp = async ({
   );
 
   return {
-  message: "OTP sent successfully",
-  expiresAt: expireAt.toISOString(),
-};
+    message: "OTP sent successfully",
+    expiresAt: expireAt.toISOString(),
+  };
 };
 
 // ======================================================
@@ -534,10 +590,10 @@ const verifyChangeEmailOtp = async ({
   }
 
   if (user.googleId) {
-  throw new Error(
-    "Email address cannot be changed for Google-authenticated accounts"
-  );
-}
+    throw new Error(
+      "Email address cannot be changed for Google-authenticated accounts"
+    );
+  }
 
   // Check again before changing email
   const existingUser = await User.findOne({
@@ -670,9 +726,9 @@ const sendChangePasswordOtp = async ({
   );
 
   return {
-  message: "OTP sent successfully",
-  expiresAt: expireAt.toISOString(),
-};
+    message: "OTP sent successfully",
+    expiresAt: expireAt.toISOString(),
+  };
 };
 
 // ======================================================

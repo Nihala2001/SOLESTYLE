@@ -429,13 +429,6 @@ function AdminOffers() {
     <AdminLayout title="Offers">
       <div className="offers-page">
         <div className="offers-header">
-          <div>
-            <h2>Offer Management</h2>
-            <p>
-              Create product and category discounts for your customers.
-            </p>
-          </div>
-
           <button
             className="offers-primary-btn"
             onClick={openAddModal}

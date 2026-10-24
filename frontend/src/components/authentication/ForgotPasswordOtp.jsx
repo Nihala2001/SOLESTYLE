@@ -300,7 +300,7 @@ function ForgotPasswordOtp() {
         <div className="forgot-otp-back">
           <button
             type="button"
-            onClick={() => navigate("/forgot-password")}
+            onClick={() => navigate("/forgot-password", { replace: true })}
           >
             ← BACK
           </button>

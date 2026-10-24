@@ -77,16 +77,17 @@ function App() {
 
         <Route element={<GuestRoute />}>
           <Route path="/register" element={<Register />} />
+          
           <Route path="/login" element={<Login />} />
+
+          <Route path="/verify-otp" element={<RegisterOtp />} />
+
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+
+          <Route path="/forgot-password-otp" element={<ForgotPasswordOtp />} />
+
+          <Route path="/reset-password" element={<ResetPassword />} />
         </Route>
-
-        <Route path="/verify-otp" element={<RegisterOtp />} />
-
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-
-        <Route path="/forgot-password-otp" element={<ForgotPasswordOtp />} />
-
-        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* ================= ADMIN ================= */}
 

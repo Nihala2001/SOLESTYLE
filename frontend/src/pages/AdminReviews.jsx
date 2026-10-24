@@ -130,11 +130,6 @@ function AdminReviews() {
         <AdminLayout title="Review Management">
             <div className="admin-reviews">
                 <div className="reviews-heading">
-                    <div>
-                        <h2>Customer Reviews</h2>
-                        <p>Manage ratings, visibility, and admin replies.</p>
-                    </div>
-
                     <span className="reviews-count">
                         {reviews.length} reviews
                     </span>
