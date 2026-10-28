@@ -1027,3 +1027,36 @@
     width: 100%;
   }
 }
+.product-review-card {
+  position: relative;
+}
+
+.product-review-delete {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #b34b65;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.product-review-delete:hover {
+  background-color: #fbe9ee;
+  color: #8f2945;
+  transform: scale(1.05);
+}
+
+.product-review-delete:focus-visible {
+  outline: 2px solid #b34b65;
+  outline-offset: 2px;
+}

@@ -10,7 +10,9 @@ import Login from "./components/authentication/Login";
 import ForgotPassword from "./components/authentication/ForgotPassword";
 import ForgotPasswordOtp from "./components/authentication/ForgotPasswordOtp";
 import ResetPassword from "./components/authentication/ResetPassword";
+
 import GuestRoute from "./components/GuestRoute";
+import AdminProtectedRoute from "./components/admin/AdminProtectedRoute";
 
 import Home from "./pages/Home";
 import UserProfile from "./pages/UserProfile";
@@ -77,7 +79,7 @@ function App() {
 
         <Route element={<GuestRoute />}>
           <Route path="/register" element={<Register />} />
-          
+
           <Route path="/login" element={<Login />} />
 
           <Route path="/verify-otp" element={<RegisterOtp />} />
@@ -93,46 +95,37 @@ function App() {
 
         <Route path="/admin/login" element={<AdminLogin />} />
 
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route element={<AdminProtectedRoute />}>
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/profile" element={<AdminProfile />} />
+          <Route path="/admin/categories" element={<AdminCategories />} />
+          <Route path="/admin/products" element={<AdminProducts />} />
+          <Route path="/admin/orders" element={<AdminOrders />} />
+          <Route path="/admin/users/:id" element={<AdminUserDetails />} />
+          <Route path="/admin/products/add" element={<AdminAddProduct />} />
 
-        <Route path="/admin/users" element={<AdminUsers />} />
+          <Route
+            path="/admin/products/:productId"
+            element={<AdminProductDetails />}
+          />
 
-        <Route path="/admin/profile" element={<AdminProfile />} />
+          <Route
+            path="/admin/products/:productId/variants/:variantId/edit"
+            element={<AdminEditVariant />}
+          />
 
-        <Route path="/admin/categories" element={<AdminCategories />} />
+          <Route
+            path="/admin/products/:productId/edit"
+            element={<AdminEditProduct />}
+          />
 
-        <Route path="/admin/products" element={<AdminProducts />} />
-
-        <Route path="/admin/orders" element={<AdminOrders />} />
-
-        <Route path="/admin/users/:id" element={<AdminUserDetails />} />
-
-        <Route path="/admin/products/add" element={<AdminAddProduct />} />
-
-        <Route
-          path="/admin/products/:productId"
-          element={<AdminProductDetails />}
-        />
-
-        <Route
-          path="/admin/products/:productId/variants/:variantId/edit"
-          element={<AdminEditVariant />}
-        />
-
-        <Route
-          path="/admin/products/:productId/edit"
-          element={<AdminEditProduct />}
-        />
-
-        <Route path="/admin/returns" element={<AdminReturns />} />
-
-        <Route path="/admin/coupons" element={<AdminCoupons />} />
-
-        <Route path="/admin/offers" element={<AdminOffers />} />
-
-        <Route path="/admin/reviews" element={<AdminReviews />} />
-
-        <Route path="/admin/sales-report" element={<AdminSalesReport />} />
+          <Route path="/admin/returns" element={<AdminReturns />} />
+          <Route path="/admin/coupons" element={<AdminCoupons />} />
+          <Route path="/admin/offers" element={<AdminOffers />} />
+          <Route path="/admin/reviews" element={<AdminReviews />} />
+          <Route path="/admin/sales-report" element={<AdminSalesReport />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );

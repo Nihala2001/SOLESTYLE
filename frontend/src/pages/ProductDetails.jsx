@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { Heart, ArrowLeft, Star } from "lucide-react";
-import { getProductReviews } from "../api/services/userReviewService";
+import { Heart, ArrowLeft, Star, Trash2 } from "lucide-react";
+import {
+  getProductReviews,
+  getMyReviews,
+  deleteMyReview,
+} from "../api/services/userReviewService";
 import { getActiveProducts } from "../api/services/userProductService";
 import { getProductVariants } from "../api/services/userVariantService";
 import { addToCart } from "../api/services/userCartService";
@@ -13,6 +17,7 @@ import {
 } from "../api/services/userWishlistService";
 
 import NotificationModal from "../components/common/NotificationModal";
+import ConfirmationModal from "../components/common/ConfirmationModal";
 import "./ProductDetails.css";
 
 function ProductDetails() {
@@ -35,6 +40,11 @@ function ProductDetails() {
   const [totalReviews, setTotalReviews] = useState(0);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviewsError, setReviewsError] = useState("");
+  const [myReviewIds, setMyReviewIds] = useState([]);
+  const [deleteReviewConfirmation, setDeleteReviewConfirmation] = useState({
+    isOpen: false,
+    reviewId: null,
+  });
 
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState(null);
@@ -255,6 +265,38 @@ function ProductDetails() {
     if (productId) {
       fetchReviews();
     }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [productId]);
+
+  // Fetch the logged-in customer's own review IDs.
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchMyReviewIds = async () => {
+      if (!localStorage.getItem("userToken")) {
+        setMyReviewIds([]);
+        return;
+      }
+
+      try {
+        const response = await getMyReviews();
+
+        if (isMounted) {
+          setMyReviewIds(
+            (response.reviews || []).map((review) => String(review._id)),
+          );
+        }
+      } catch (error) {
+        if (isMounted) {
+          setMyReviewIds([]);
+        }
+      }
+    };
+
+    fetchMyReviewIds();
 
     return () => {
       isMounted = false;
@@ -489,13 +531,6 @@ function ProductDetails() {
       return;
     }
 
-    if (
-      String(selectedVariant._id) === String(exchangeContext.originalVariantId)
-    ) {
-      setExchangeError("Please choose a different size or color.");
-      return;
-    }
-
     const originalPrice = Number(exchangeContext.originalPrice);
     const replacementPrice = Number(selectedVariant.price);
 
@@ -628,6 +663,47 @@ function ProductDetails() {
     );
   }
 
+  const handleDeleteReview = async (reviewId) => {
+    try {
+      await deleteMyReview(reviewId);
+
+      setMyReviewIds((previous) =>
+        previous.filter((id) => id !== String(reviewId)),
+      );
+
+      const response = await getProductReviews(productId);
+
+      setReviews(response.reviews || []);
+      setAverageRating(Number(response.averageRating) || 0);
+      setTotalReviews(Number(response.totalReviews) || 0);
+
+      showNotification(
+        "Review deleted",
+        "Your review has been deleted successfully.",
+        "success",
+      );
+    } catch (error) {
+      showNotification(
+        "Delete failed",
+        error.response?.data?.message || "Unable to delete your review.",
+        "error",
+      );
+    }
+  };
+
+  const confirmDeleteReview = async () => {
+    const reviewId = deleteReviewConfirmation.reviewId;
+
+    setDeleteReviewConfirmation({
+      isOpen: false,
+      reviewId: null,
+    });
+
+    if (reviewId) {
+      await handleDeleteReview(reviewId);
+    }
+  };
+
   // ================= PAGE =================
 
   return (
@@ -646,6 +722,21 @@ function ProductDetails() {
           duration={2000}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={deleteReviewConfirmation.isOpen}
+        title="Delete Review?"
+        message="Are you sure you want to delete your review? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Keep Review"
+        onCancel={() =>
+          setDeleteReviewConfirmation({
+            isOpen: false,
+            reviewId: null,
+          })
+        }
+        onConfirm={confirmDeleteReview}
+      />
 
       <button
         type="button"
@@ -904,7 +995,6 @@ function ProductDetails() {
         <div className="product-reviews-heading">
           <div>
             <h2>Customer Reviews</h2>
-            <p>See what our customers think about this product.</p>
           </div>
         </div>
 
@@ -999,6 +1089,67 @@ function ProductDetails() {
                     )}
 
                     <p className="product-review-comment">{review.comment}</p>
+
+                    {myReviewIds.includes(String(review._id)) && (
+                      <button
+                        type="button"
+                        className="product-review-delete"
+                        title="Delete my review"
+                        aria-label="Delete my review"
+                        onClick={() =>
+                          setDeleteReviewConfirmation({
+                            isOpen: true,
+                            reviewId: review._id,
+                          })
+                        }
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                    {review.adminReply?.trim() && (
+                      <div
+                        style={{
+                          marginTop: "14px",
+                          padding: "12px 14px",
+                          background: "#fff5f7",
+                          borderLeft: "3px solid #d88ca0",
+                          borderRadius: "6px",
+                        }}
+                      >
+                        <strong
+                          style={{
+                            display: "block",
+                            marginBottom: "6px",
+                            color: "#9b5369",
+                          }}
+                        >
+                          Reply from SOLESTYLE
+                        </strong>
+
+                        <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+                          {review.adminReply}
+                        </p>
+
+                        {review.adminRepliedAt && (
+                          <small
+                            style={{
+                              display: "block",
+                              marginTop: "8px",
+                              color: "#777",
+                            }}
+                          >
+                            {new Date(review.adminRepliedAt).toLocaleDateString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              },
+                            )}
+                          </small>
+                        )}
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
@@ -1013,59 +1164,6 @@ function ProductDetails() {
         <section className="similar-products-section">
           <div className="similar-products-heading">
             <h2>You May Also Like</h2>
-            <p>Discover more styles from the same category.</p>
-          </div>
-
-          <div className="similar-products-toolbar">
-            <div className="similar-products-control">
-              <label htmlFor="similar-sort">Sort by</label>
-              <select
-                id="similar-sort"
-                value={similarSortBy}
-                onChange={(event) => setSimilarSortBy(event.target.value)}
-              >
-                <option value="recommended">Recommended</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="name-asc">Name: A to Z</option>
-                <option value="newest">Newest First</option>
-              </select>
-            </div>
-
-            <div className="similar-products-control">
-              <label htmlFor="similar-max-price">Max price (₹)</label>
-              <input
-                id="similar-max-price"
-                type="number"
-                min="0"
-                placeholder="Any price"
-                value={similarMaxPrice}
-                onChange={(event) => setSimilarMaxPrice(event.target.value)}
-              />
-            </div>
-
-            <label className="similar-stock-filter">
-              <input
-                type="checkbox"
-                checked={similarInStockOnly}
-                onChange={(event) =>
-                  setSimilarInStockOnly(event.target.checked)
-                }
-              />
-              In stock only
-            </label>
-
-            <button
-              type="button"
-              className="similar-reset-filters"
-              onClick={() => {
-                setSimilarSortBy("recommended");
-                setSimilarMaxPrice("");
-                setSimilarInStockOnly(false);
-              }}
-            >
-              Clear filters
-            </button>
           </div>
 
           {filteredSimilarProducts.length > 0 ? (

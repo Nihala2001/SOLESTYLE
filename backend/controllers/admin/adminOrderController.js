@@ -855,6 +855,22 @@ const updateReturnExchangeStatus = async (req, res) => {
                     );
                 }
 
+                // Restore the returned product's stock when it is received.
+                if (status === "Product Received") {
+                    if (item.variantId) {
+                        const originalVariant = await Variant.findById(
+                            item.variantId
+                        ).session(session);
+
+                        if (originalVariant) {
+                            originalVariant.stock =
+                                Number(originalVariant.stock || 0) +
+                                Number(request.quantity || 1);
+
+                            await originalVariant.save({ session });
+                        }
+                    }
+                }
                 // Check and reserve replacement stock when it ships.
                 if (status === "Replacement Shipped") {
                     if (

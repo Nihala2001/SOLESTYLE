@@ -23,3 +23,10 @@ export const getMyReviews = async () => {
 
     return response.data;
 };
+
+
+/* Delete a review owned by the logged-in customer */
+export const deleteMyReview = async (reviewId) => {
+    const response = await api.delete(`/reviews/${reviewId}`);
+    return response.data;
+};
