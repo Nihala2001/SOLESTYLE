@@ -22,3 +22,5 @@ build/
 *.log
 npm-debug.log*
 solestyle-backup/
+# Local npm cache
+.npm/
