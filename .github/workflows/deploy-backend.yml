@@ -53,30 +53,35 @@ jobs:
 
           DEPLOY_SCRIPT=$(cat <<'SCRIPT'
           set -e
-          sudo -iu ec2-user bash -lc '
-            set -e
-            cd /home/ec2-user/SOLESTYLE
 
-            if [ -n "$(git status --porcelain)" ]; then
-              echo "ERROR: EC2 repository has local changes. Deployment stopped."
-              git status --short
-              exit 1
-            fi
+          sudo -iu ec2-user bash <<'REMOTE'
+          set -e
+          cd /home/ec2-user/SOLESTYLE
 
-            git fetch origin main
-            git merge --ff-only origin/main
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "ERROR: EC2 repository has local changes. Deployment stopped."
+            git status --short
+            exit 1
+          fi
 
-            cd backend
-            npm ci --omit=dev
+          git fetch origin main
+          git merge --ff-only origin/main
 
-            pm2 restart solestyle-backend --update-env
-            sleep 3
-            pm2 describe solestyle-backend
-          '
+          cd backend
+          npm ci --omit=dev
+
+          pm2 restart solestyle-backend --update-env
+          sleep 3
+          pm2 describe solestyle-backend
+          REMOTE
           SCRIPT
           )
 
-          PARAMETERS=$(jq -n --arg command "$DEPLOY_SCRIPT" \
+          ENCODED_SCRIPT=$(printf '%s' "$DEPLOY_SCRIPT" | base64 | tr -d '\n')
+
+          SSM_COMMAND="printf '%s' '$ENCODED_SCRIPT' | base64 -d | bash"
+
+          PARAMETERS=$(jq -n --arg command "$SSM_COMMAND" \
             '{commands: [$command]}')
 
           COMMAND_ID=$(aws ssm send-command \
